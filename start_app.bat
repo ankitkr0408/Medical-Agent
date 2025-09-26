@@ -1,0 +1,13 @@
+@echo off
+echo 🏥 Starting Medical Image Analysis Platform...
+echo.
+echo Activating virtual environment...
+call venv\Scripts\activate.bat
+echo.
+echo Testing MongoDB connection...
+python -c "from db import client; client.admin.command('ping'); print('✅ MongoDB connected successfully!')"
+echo.
+echo Starting Streamlit application...
+echo 🌐 The app will open at: http://localhost:8502
+streamlit run app.py --server.port 8502 --server.address localhost
+pause
