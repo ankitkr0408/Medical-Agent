@@ -144,6 +144,44 @@ with tabs[1]:
                             for idx, finding in enumerate(analysis_results["findings"], 1):
                                 st.markdown(f"{idx}. {finding}")
                         
+                        # Display doctor recommendations prominently
+                        if analysis_results.get("doctor_recommendations"):
+                            doctor_recs = analysis_results["doctor_recommendations"]
+                            
+                            st.subheader("🩺 Recommended Medical Specialists")
+                            
+                            # Primary specialist recommendation
+                            if doctor_recs.get("primary_specialist"):
+                                st.markdown("### 🎯 **Best Doctor to See First:**")
+                                st.info(doctor_recs["primary_specialist"])
+                            
+                            # Urgency level
+                            urgency = doctor_recs.get("urgency_level", "Routine")
+                            urgency_colors = {
+                                "Emergency": "🔴",
+                                "Urgent": "🟡", 
+                                "Routine": "🟢"
+                            }
+                            st.markdown(f"**Urgency Level:** {urgency_colors.get(urgency, '🟢')} {urgency}")
+                            
+                            # Additional specialists
+                            if doctor_recs.get("additional_specialists"):
+                                st.markdown("### 👥 **Additional Specialists to Consider:**")
+                                for specialist in doctor_recs["additional_specialists"]:
+                                    st.markdown(f"• {specialist}")
+                            
+                            # Questions to ask
+                            if doctor_recs.get("questions_to_ask"):
+                                with st.expander("❓ **Important Questions to Ask Your Doctor**"):
+                                    for idx, question in enumerate(doctor_recs["questions_to_ask"], 1):
+                                        st.markdown(f"{idx}. {question}")
+                            
+                            # Specialist criteria
+                            if doctor_recs.get("specialist_criteria"):
+                                with st.expander("🔍 **What to Look for in a Specialist**"):
+                                    for criteria in doctor_recs["specialist_criteria"]:
+                                        st.markdown(f"• {criteria}")
+                        
                         if analysis_results.get("keywords"):
                             st.subheader("Keywords")
                             st.markdown(f"*{', '.join(analysis_results['keywords'])}*")
@@ -218,6 +256,20 @@ with tabs[4]:
                     st.markdown("**Key Findings:**")
                     for f_idx, finding in enumerate(analysis["findings"], 1):
                         st.markdown(f"{f_idx}. {finding}")
+                
+                # Display doctor recommendations if available
+                if analysis.get("doctor_recommendations"):
+                    doctor_recs = analysis["doctor_recommendations"]
+                    st.markdown("**🩺 Doctor Recommendations:**")
+                    
+                    if doctor_recs.get("primary_specialist"):
+                        st.markdown(f"**Primary Specialist:** {doctor_recs['primary_specialist'][:100]}...")
+                    
+                    if doctor_recs.get("urgency_level"):
+                        urgency_colors = {"Emergency": "🔴", "Urgent": "🟡", "Routine": "🟢"}
+                        urgency = doctor_recs["urgency_level"]
+                        st.markdown(f"**Urgency:** {urgency_colors.get(urgency, '🟢')} {urgency}")
+                
                 if st.button(f"Generate Report #{idx}"):
                     pdf_buffer = generate_report(analysis, include_references)
                     if pdf_buffer:

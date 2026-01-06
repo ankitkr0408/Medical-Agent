@@ -40,8 +40,8 @@ def render_welcome_dashboard():
     with col3:
         st.metric(label="📊 Total Reports", value=get_total_reports_count(user_id), delta="All time")
 
-    with col4:
-        st.metric(label="🤖 AI Accuracy", value="94.2%", delta="Industry leading")
+    #with col4:
+     #   st.metric(label="🤖 AI Accuracy", value="94.2%", delta="Industry leading")
 
     # ---------------- Quick Actions ----------------
     st.subheader("🚀 Quick Actions")

@@ -160,9 +160,9 @@ def get_multidisciplinary_summary(case_description, specialist_opinions, finding
 
     opinions_text = "\n".join([f"- {opinion}" for opinion in specialist_opinions])
 
-    from prompts import MULTIDISCIPLINARY_SUMMARY_PROMPT
+    from prompts import ENHANCED_MULTIDISCIPLINARY_SUMMARY_PROMPT
     
-    system_prompt = f"""{MULTIDISCIPLINARY_SUMMARY_PROMPT}
+    system_prompt = f"""{ENHANCED_MULTIDISCIPLINARY_SUMMARY_PROMPT}
 
 Case: "{case_description}"
 {findings_text}
@@ -170,7 +170,7 @@ Case: "{case_description}"
 Specialist Opinions from our team:
 {opinions_text}
 
-Please provide your comprehensive multidisciplinary summary."""
+Please provide your comprehensive multidisciplinary summary with specific doctor recommendations."""
 
     try:
         response = client.chat.completions.create(

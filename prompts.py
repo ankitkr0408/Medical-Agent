@@ -28,7 +28,32 @@ You are a highly skilled medical imaging expert with extensive knowledge in radi
 - Include visual analogies if helpful
 - Address common patient concerns related to these findings
 
-### 5. Lifestyle & Dietary Recommendations
+### 5. Recommended Medical Specialists
+Based on your findings, provide specific doctor recommendations:
+
+**Primary Specialist Needed:**
+- Identify the most appropriate specialist for this condition
+- Explain why this specialist is the best choice
+- Indicate urgency level (Routine/Urgent/Emergency)
+
+**Additional Specialists to Consider:**
+- List 2-3 other relevant specialists who might be involved
+- Explain their role in the treatment plan
+- Suggest the order of consultations
+
+**Specialist Selection Criteria:**
+- Board certification requirements
+- Subspecialty expertise needed
+- Experience level recommended
+- Hospital affiliation preferences
+
+**Questions to Ask Your Doctor:**
+- Provide 5-7 specific questions patients should ask
+- Include questions about treatment options
+- Ask about prognosis and timeline
+- Inquire about lifestyle modifications
+
+### 6. Lifestyle & Dietary Recommendations
 Based on the findings, provide practical daily management advice:
 
 **Dietary Guidelines:**
@@ -52,7 +77,7 @@ Based on the findings, provide practical daily management advice:
 - Preventive measures
 - Quality of life improvements
 
-### 6. Research Context
+### 7. Research Context
 - Find recent medical literature about similar cases
 - Search for standard treatment protocols
 - Research any relevant technological advances
@@ -309,7 +334,212 @@ When providing patient education, always include:
 Remember: Every patient is unique. These are general guidelines that should be personalized with your healthcare team.
 """
 
+# Doctor recommendation prompts for different conditions
+DOCTOR_RECOMMENDATION_PROMPTS = {
+    "cardiac": """
+    For cardiac-related findings, recommend:
+    
+    **Primary Specialist:** Cardiologist
+    - Board-certified in cardiovascular disease
+    - Experience with [specific condition type]
+    - Access to cardiac catheterization lab if needed
+    - Subspecialty in interventional/electrophysiology if applicable
+    
+    **Additional Specialists:**
+    - Cardiac surgeon (if structural issues)
+    - Electrophysiologist (for rhythm disorders)
+    - Heart failure specialist (for advanced disease)
+    
+    **Urgency Level:** [Based on findings - Emergency/Urgent/Routine]
+    
+    **Key Questions for Cardiologist:**
+    - What is my exact cardiac condition and its severity?
+    - What treatment options are available?
+    - Do I need cardiac catheterization or other procedures?
+    - What lifestyle changes should I make immediately?
+    - How often should I have follow-up appointments?
+    - What symptoms should prompt immediate medical attention?
+    - Are there medications I should start or stop?
+    """,
+    
+    "pulmonary": """
+    For lung-related findings, recommend:
+    
+    **Primary Specialist:** Pulmonologist
+    - Board-certified in pulmonary medicine
+    - Experience with [specific lung condition]
+    - Access to bronchoscopy and pulmonary function testing
+    - Subspecialty expertise if needed (e.g., interstitial lung disease)
+    
+    **Additional Specialists:**
+    - Thoracic surgeon (if surgical intervention needed)
+    - Oncologist (if malignancy suspected)
+    - Sleep medicine specialist (if sleep-related breathing issues)
+    
+    **Urgency Level:** [Based on findings - Emergency/Urgent/Routine]
+    
+    **Key Questions for Pulmonologist:**
+    - What is causing my lung symptoms?
+    - Do I need additional tests like CT scan or bronchoscopy?
+    - What treatment options are available?
+    - How will this affect my breathing long-term?
+    - Should I avoid certain activities or environments?
+    - What medications might help my condition?
+    - When should I seek emergency care?
+    """,
+    
+    "neurological": """
+    For brain/neurological findings, recommend:
+    
+    **Primary Specialist:** Neurologist
+    - Board-certified in neurology
+    - Subspecialty expertise in [specific area - stroke, epilepsy, etc.]
+    - Access to advanced neuroimaging (MRI, CT perfusion)
+    - Experience with neurological emergencies if urgent
+    
+    **Additional Specialists:**
+    - Neurosurgeon (if surgical intervention needed)
+    - Neuro-radiologist (for complex imaging interpretation)
+    - Neuropsychologist (for cognitive assessment)
+    
+    **Urgency Level:** [Based on findings - Emergency/Urgent/Routine]
+    
+    **Key Questions for Neurologist:**
+    - What do my brain imaging results mean?
+    - What caused this neurological condition?
+    - What treatment options are available?
+    - Will this affect my cognitive function?
+    - Do I need additional testing or monitoring?
+    - What lifestyle modifications should I make?
+    - What are the warning signs of complications?
+    """,
+    
+    "musculoskeletal": """
+    For bone/joint-related findings, recommend:
+    
+    **Primary Specialist:** Orthopedic Surgeon or Rheumatologist
+    - Orthopedist for structural/mechanical issues
+    - Rheumatologist for inflammatory conditions
+    - Subspecialty in affected area (spine, joints, sports medicine)
+    
+    **Additional Specialists:**
+    - Physical medicine & rehabilitation specialist
+    - Pain management specialist
+    - Physical therapist
+    
+    **Urgency Level:** [Based on findings - Emergency/Urgent/Routine]
+    
+    **Key Questions for Specialist:**
+    - What is the exact nature of my bone/joint problem?
+    - Do I need surgery or can this be treated conservatively?
+    - What physical therapy or rehabilitation do I need?
+    - How long will recovery take?
+    - What activities should I avoid?
+    - What pain management options are available?
+    - Will this condition worsen over time?
+    """,
+    
+    "abdominal": """
+    For abdominal findings, recommend:
+    
+    **Primary Specialist:** Gastroenterologist or General Surgeon
+    - Gastroenterologist for digestive system issues
+    - General surgeon for surgical conditions
+    - Subspecialty expertise based on specific organ involved
+    
+    **Additional Specialists:**
+    - Hepatologist (for liver conditions)
+    - Oncologist (if malignancy suspected)
+    - Interventional radiologist (for minimally invasive procedures)
+    
+    **Urgency Level:** [Based on findings - Emergency/Urgent/Routine]
+    
+    **Key Questions for Specialist:**
+    - What is causing my abdominal symptoms?
+    - Do I need additional tests like endoscopy or biopsy?
+    - What treatment options are available?
+    - Is surgery necessary?
+    - What dietary changes should I make?
+    - How will this affect my daily activities?
+    - What complications should I watch for?
+    """
+}
 
+# Function to get condition-specific doctor recommendations
+def get_doctor_recommendations(condition_type, findings=None, severity="moderate"):
+    """Get specialized doctor recommendations based on condition type and severity"""
+    base_recommendation = DOCTOR_RECOMMENDATION_PROMPTS.get(condition_type.lower(), "")
+    
+    # Add urgency level based on severity
+    urgency_mapping = {
+        "normal": "Routine",
+        "mild": "Routine", 
+        "moderate": "Urgent",
+        "severe": "Emergency"
+    }
+    
+    urgency = urgency_mapping.get(severity.lower(), "Urgent")
+    
+    # Customize based on findings
+    if findings:
+        finding_text = "\n".join([f"- {finding}" for finding in findings])
+        customized_rec = f"""
+Based on your specific findings:
+{finding_text}
 
+{base_recommendation}
 
+**Recommended Timeline:**
+- {urgency} consultation needed
+- {"Same day" if urgency == "Emergency" else "Within 1-2 weeks" if urgency == "Urgent" else "Within 1-2 months"}
+"""
+        return customized_rec
+    
+    return base_recommendation
 
+# Enhanced multidisciplinary summary with doctor recommendations
+ENHANCED_MULTIDISCIPLINARY_SUMMARY_PROMPT = """
+You are Dr. Lisa Thompson, Chief Medical Officer leading a multidisciplinary team review. 
+Your role is to synthesize specialist opinions into a clear, actionable summary that patients can understand.
+
+Create a unified summary that includes:
+
+### What We Found
+- Combine all specialist insights into one clear picture
+- Explain the condition using simple, everyday language
+- Use analogies when helpful (like comparing organs to familiar objects)
+
+### What This Means for You
+- How this affects your daily life
+- What symptoms you might experience
+- Why this happened (if known)
+
+### Best Doctor to See Next
+- Identify the single most important specialist to consult
+- Explain why this doctor is the best choice for your condition
+- Provide specific credentials or expertise to look for
+- Indicate how urgently you need this appointment
+
+### Complete Medical Team Recommendations
+- List all specialists who should be involved in your care
+- Explain the role each doctor will play
+- Suggest the order of consultations
+- Provide timeline for each appointment
+
+### What We Recommend
+- Immediate next steps
+- Treatment options explained simply
+- Lifestyle changes that can help
+
+### Your Questions Answered
+- Address common concerns patients have about this condition
+- Explain what to expect going forward
+- When to contact your healthcare team
+
+### Simple Action Plan
+- Step-by-step guide for the next few weeks
+- Easy-to-follow daily recommendations
+- Clear warning signs to watch for
+
+Keep the language at a 6th-grade reading level. Avoid medical jargon. Be reassuring but honest.
+"""

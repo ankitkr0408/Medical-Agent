@@ -111,21 +111,15 @@ def extract_findings_and_keywords(analysis_text):
 
 # -------------------- OpenAI Analysis --------------------
 def analyze_image(image, api_key, enable_xai=True):
-    """Analyze medical image using OpenAI's vision model."""
+    """Analyze medical image using OpenAI's vision model with enhanced doctor recommendations."""
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
     encoded_image = base64.b64encode(buffered.getvalue()).decode()
 
     client = openai.OpenAI(api_key=api_key)
 
-    prompt = """
-    Provide a detailed medical analysis of this image. 
-    Include:
-    1. Description of key findings
-    2. Possible diagnoses
-    3. Recommendations for clinical correlation or follow-up
-    Format your response with "Radiological Analysis" and "Impression" sections.
-    """
+    # Import the enhanced analysis prompt
+    from prompts import ANALYSIS_PROMPT
 
     try:
         response = client.chat.completions.create(
@@ -133,19 +127,24 @@ def analyze_image(image, api_key, enable_xai=True):
             messages=[{
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": ANALYSIS_PROMPT},
                     {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}}
                 ]
             }],
-            max_tokens=800,
+            max_tokens=1200,  # Increased for comprehensive response including doctor recommendations
         )
         analysis = response.choices[0].message.content
         findings, keywords = extract_findings_and_keywords(analysis)
+        
+        # Extract doctor recommendations from the analysis
+        doctor_recommendations = extract_doctor_recommendations(analysis)
+        
         return {
             "id": str(uuid.uuid4()),
             "analysis": analysis,
             "findings": findings,
             "keywords": keywords,
+            "doctor_recommendations": doctor_recommendations,
             "date": datetime.now().isoformat()
         }
     except Exception as e:
@@ -154,8 +153,69 @@ def analyze_image(image, api_key, enable_xai=True):
             "analysis": f"Error analyzing image: {str(e)}",
             "findings": [],
             "keywords": [],
+            "doctor_recommendations": {},
             "date": datetime.now().isoformat()
         }
+
+
+def extract_doctor_recommendations(analysis_text):
+    """Extract doctor recommendations from AI-generated analysis text."""
+    recommendations = {
+        "primary_specialist": "",
+        "additional_specialists": [],
+        "urgency_level": "Routine",
+        "questions_to_ask": [],
+        "specialist_criteria": []
+    }
+    
+    # Extract primary specialist
+    if "Primary Specialist Needed:" in analysis_text:
+        primary_section = analysis_text.split("Primary Specialist Needed:")[1].split("**Additional Specialists")[0]
+        recommendations["primary_specialist"] = primary_section.strip()
+    
+    # Extract additional specialists
+    if "Additional Specialists to Consider:" in analysis_text:
+        additional_section = analysis_text.split("Additional Specialists to Consider:")[1].split("**Specialist Selection")[0]
+        # Parse bullet points
+        for line in additional_section.split('\n'):
+            line = line.strip()
+            if line.startswith('-') or line.startswith('•'):
+                recommendations["additional_specialists"].append(line[1:].strip())
+    
+    # Extract urgency level
+    urgency_keywords = {
+        "emergency": "Emergency",
+        "urgent": "Urgent", 
+        "routine": "Routine",
+        "immediate": "Emergency",
+        "asap": "Urgent"
+    }
+    
+    analysis_lower = analysis_text.lower()
+    for keyword, level in urgency_keywords.items():
+        if keyword in analysis_lower:
+            recommendations["urgency_level"] = level
+            break
+    
+    # Extract questions to ask
+    if "Questions to Ask Your Doctor:" in analysis_text:
+        questions_section = analysis_text.split("Questions to Ask Your Doctor:")[1].split("###")[0]
+        for line in questions_section.split('\n'):
+            line = line.strip()
+            if line.startswith('-') or line.startswith('•') or line.endswith('?'):
+                clean_question = line.lstrip('-•').strip()
+                if clean_question and '?' in clean_question:
+                    recommendations["questions_to_ask"].append(clean_question)
+    
+    # Extract specialist criteria
+    if "Specialist Selection Criteria:" in analysis_text:
+        criteria_section = analysis_text.split("Specialist Selection Criteria:")[1].split("**Questions to Ask")[0]
+        for line in criteria_section.split('\n'):
+            line = line.strip()
+            if line.startswith('-') or line.startswith('•'):
+                recommendations["specialist_criteria"].append(line[1:].strip())
+    
+    return recommendations
 
 
 # -------------------- PubMed & Clinical Trials --------------------
@@ -250,6 +310,32 @@ def generate_report(data, include_references=True):
         kw_list = ListFlowable([ListItem(Paragraph(kw, normal_style)) for kw in data["keywords"]], bulletType="bullet")
         content.append(kw_list)
         content.append(Spacer(1, 12))
+
+    # Add doctor recommendations section
+    if data.get("doctor_recommendations"):
+        doctor_recs = data["doctor_recommendations"]
+        content.append(Paragraph("Doctor Recommendations", subtitle_style))
+        
+        if doctor_recs.get("primary_specialist"):
+            content.append(Paragraph("<b>Primary Specialist Recommended:</b>", normal_style))
+            content.append(Paragraph(doctor_recs["primary_specialist"], normal_style))
+            content.append(Spacer(1, 8))
+        
+        if doctor_recs.get("urgency_level"):
+            content.append(Paragraph(f"<b>Urgency Level:</b> {doctor_recs['urgency_level']}", normal_style))
+            content.append(Spacer(1, 8))
+        
+        if doctor_recs.get("additional_specialists"):
+            content.append(Paragraph("<b>Additional Specialists:</b>", normal_style))
+            spec_list = ListFlowable([ListItem(Paragraph(spec, normal_style)) for spec in doctor_recs["additional_specialists"]], bulletType="bullet")
+            content.append(spec_list)
+            content.append(Spacer(1, 8))
+        
+        if doctor_recs.get("questions_to_ask"):
+            content.append(Paragraph("<b>Questions to Ask Your Doctor:</b>", normal_style))
+            q_list = ListFlowable([ListItem(Paragraph(q, normal_style)) for q in doctor_recs["questions_to_ask"]], bulletType="bullet")
+            content.append(q_list)
+            content.append(Spacer(1, 12))
 
     if include_references:
         ref_results = search_references(data.get("keywords", []), max_results=3)

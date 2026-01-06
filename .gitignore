@@ -1,5 +1,31 @@
+# Environment variables
 .env
+
+# Data files
 analysis_store.json
 qa_chat_store.json
 chat_store.json
 users.json
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Models (if large)
+models/*.h5
+models/*.pkl
+models/*.pth

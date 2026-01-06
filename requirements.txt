@@ -29,3 +29,9 @@ fastapi==0.105.0
 uvicorn==0.24.0
 pydantic==2.5.2
 python-multipart==0.0.6
+
+#to open... 
+# & "c:/Users/Ankit kumar/Downloads/Medical Imaging Diagnosis agent/Medical Imaging Diagnosis agent/venv/Scripts/Activate.ps1"
+# and then 
+# .\start_app.ps1
+# to start the project 
