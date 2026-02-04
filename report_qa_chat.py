@@ -132,7 +132,7 @@ class ReportQAChat:
         room_data = {
             "_id": room_id,
             "user_id": user_id,
-            "name": room_name,
+            "room_name": room_name,
             "created_at": datetime.now().isoformat(),
             "creator": user_name,
             "messages": [{
@@ -173,7 +173,7 @@ class ReportQAChat:
     def get_qa_rooms(self, user_id=None):
         """Get all QA rooms for a specific user"""
         query = {"user_id": user_id} if user_id else {}
-        rooms = list(self.qa_collection.find(query, {"_id": 1, "name": 1, "creator": 1, "created_at": 1}))
+        rooms = list(self.qa_collection.find(query, {"_id": 1, "room_name": 1, "creator": 1, "created_at": 1}))
         for r in rooms:
             r["id"] = r["_id"]
         # Sort rooms by created_at (newest first)
@@ -184,3 +184,17 @@ class ReportQAChat:
         """Delete a QA chat room"""
         result = self.qa_collection.delete_one({"_id": room_id})
         return result.deleted_count > 0
+    
+    def get_qa_response(self, room_id, question, user_id, api_key):
+        """Get a response to a question using the QA system"""
+        # Initialize QA system with API key
+        qa_system = ReportQASystem(api_key=api_key)
+        
+        # Get answer
+        answer = qa_system.answer_question(question)
+        
+        # Add both question and answer to the room messages
+        self.add_message(room_id, "User", question)
+        self.add_message(room_id, "AI Assistant", answer)
+        
+        return answer

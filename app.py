@@ -122,6 +122,9 @@ with tabs[1]:
                 st.image(file_data["data"], caption=f"Uploaded {file_data['type']} image", use_container_width=True)
                 
                 if st.button("🔍 Analyze Image", use_container_width=True):
+                    # Display prominent medical disclaimer
+                    st.warning("⚠️ **MEDICAL DISCLAIMER**: This AI analysis is for educational purposes ONLY and may contain errors. It is NOT a medical diagnosis and cannot replace professional medical examination. Always consult qualified healthcare professionals (radiologist, physician) for accurate diagnosis and treatment.")
+                    
                     with st.spinner("Analyzing image..."):
                         analysis_results = analyze_image(
                             file_data["data"], 
@@ -136,7 +139,8 @@ with tabs[1]:
                         qa_analysis_collection.insert_one(analysis_results)
                         
                         st.session_state.analysis_results = analysis_results
-                        st.subheader("Analysis Results")
+                        st.subheader("AI-Assisted Educational Observations")
+                        st.info("📋 Remember: These are AI-generated observations for educational purposes. Please review with a licensed healthcare professional.")
                         st.markdown(analysis_results["analysis"])
                         
                         if analysis_results.get("findings"):

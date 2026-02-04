@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Medical Image Analysis Platform Setup Script
 This script sets up the virtual environment and installs all dependencies
@@ -8,6 +9,14 @@ import os
 import sys
 import subprocess
 import platform
+
+# Set UTF-8 encoding for console output on Windows
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except AttributeError:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 def run_command(command, shell=True):
     """Run a command and return success status"""
