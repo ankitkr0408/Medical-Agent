@@ -1,7 +1,7 @@
 # dashboard.py
 import streamlit as st
 from datetime import datetime
-from db import get_db
+from db import qa_analysis_collection, qa_chat_collection
 from utils_simple import get_latest_analyses
 
 def render_welcome_dashboard():
@@ -127,23 +127,35 @@ def render_doctor_tips():
 
 # ------------------ MongoDB-based stats (user-specific) ------------------
 def get_today_analysis_count(user_id=None):
-    db = get_db()
-    today = datetime.now().strftime("%Y-%m-%d")
-    query = {"date": {"$regex": f"^{today}"}}
-    if user_id:
-        query["user_id"] = user_id
-    return db.qa_analyses.count_documents(query)
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        query = {"date": {"$regex": f"^{today}"}}
+        if user_id:
+            query["user_id"] = user_id
+        
+        # Use the collection object which has LocalStorage fallback
+        results = qa_analysis_collection.find(query)
+        return len(list(results)) if results else 0
+    except Exception as e:
+        print(f"Error counting analyses: {e}")
+        return 0
 
 
 def get_active_discussions_count(user_id=None):
-    db = get_db()
-    query = {"participants": {"$in": [user_id]}} if user_id else {}
-    return db.qa_chats.count_documents(query)
+    try:
+        query = {"user_id": user_id} if user_id else {}
+        results = qa_chat_collection.find(query)
+        return len(list(results)) if results else 0
+    except Exception as e:
+        print(f"Error counting discussions: {e}")
+        return 0
 
 
 def get_total_reports_count(user_id=None):
-    db = get_db()
-    query = {}
-    if user_id:
-        query["user_id"] = user_id
-    return db.qa_analyses.count_documents(query)
+    try:
+        query = {"user_id": user_id} if user_id else {}
+        results = qa_analysis_collection.find(query)
+        return len(list(results)) if results else 0
+    except Exception as e:
+        print(f"Error counting reports: {e}")
+        return 0

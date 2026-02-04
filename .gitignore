@@ -1,11 +1,14 @@
 # Environment variables
 .env
+frontend/.env
+frontend/.env.local
 
 # Data files
 analysis_store.json
 qa_chat_store.json
 chat_store.json
 users.json
+local_data_*.json
 
 # Python cache
 __pycache__/
@@ -29,3 +32,11 @@ ENV/
 models/*.h5
 models/*.pkl
 models/*.pth
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.turbo/
+frontend/dist/
