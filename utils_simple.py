@@ -139,12 +139,20 @@ def analyze_image(image, api_key, enable_xai=True):
         # Extract doctor recommendations from the analysis
         doctor_recommendations = extract_doctor_recommendations(analysis)
         
+        # Search for PubMed articles
+        pubmed_articles = search_pubmed(keywords, max_results=3)
+
+        # Search for Clinical Trials
+        clinical_trials = search_clinical_trials(keywords, max_results=2)
+        
         return {
             "id": str(uuid.uuid4()),
             "analysis": analysis,
             "findings": findings,
             "keywords": keywords,
             "doctor_recommendations": doctor_recommendations,
+            "pubmed_articles": pubmed_articles,
+            "clinical_trials": clinical_trials,
             "date": datetime.now().isoformat()
         }
     except Exception as e:

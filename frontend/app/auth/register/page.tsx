@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Clock, MessageCircle } from 'lucide-react';
+import { Mail, Lock, User, ArrowLeft, CheckCircle2, MessageCircle, Stethoscope, Sparkles, X, ShieldCheck } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
+import Button from '@/components/Button';
+import Card from '@/components/Card';
+import Input from '@/components/Input';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -24,7 +27,6 @@ export default function RegisterPage() {
         e.preventDefault();
         setError('');
 
-        // Validation
         if (formData.password !== formData.confirmPassword) {
             setError('Passwords do not match');
             return;
@@ -50,10 +52,7 @@ export default function RegisterPage() {
                 if (typeof err.response.data.detail === 'string') {
                     setError(err.response.data.detail);
                 } else if (Array.isArray(err.response.data.detail)) {
-                    const errorMessages = err.response.data.detail
-                        .map((e: any) => `${e.loc.join('.')}: ${e.msg}`)
-                        .join(', ');
-                    setError(errorMessages);
+                    setError(err.response.data.detail[0].msg);
                 } else {
                     setError('Registration failed. Please check your information.');
                 }
@@ -66,197 +65,154 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-blue-50 via-white to-cyan-50 relative overflow-hidden">
-            {/* Decorative Background Elements */}
-            <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-200/30 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
-            <div className="absolute top-1/2 right-1/4 w-64 h-64 bg-teal-200/20 rounded-full blur-2xl"></div>
+        <div className="min-h-screen w-full relative flex items-center justify-center p-4">
+            <div className="animated-bg"></div>
 
-            <div className="container mx-auto flex items-center justify-center p-4 lg:p-8 relative z-10 w-full">
-                <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
-                    {/* Left Panel - Cyan Gradient */}
-                    <div className="lg:w-2/5 bg-gradient-to-br from-cyan-400 to-teal-500 p-8 lg:p-12 text-white relative overflow-hidden">
-                        {/* Back Button */}
-                        <button
-                            onClick={() => router.push('/')}
-                            className="flex items-center gap-2 text-white/90 hover:text-white mb-12 transition-colors"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                            <span className="font-medium">Back</span>
-                        </button>
+            <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-600/10 rounded-full blur-[100px] -z-10" />
+            <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[100px] -z-10" />
 
-                        {/* Decorative circles */}
-                        <div className="absolute top-20 right-10 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-                        <div className="absolute bottom-20 left-10 w-40 h-40 bg-white/10 rounded-full blur-xl"></div>
-
-                        {/* Content */}
-                        <div className="relative z-10">
-                            <h1 className="text-3xl lg:text-4xl font-bold mb-12">
-                                Expert advice from<br />top doctors
-                            </h1>
-
-                            <div className="space-y-6">
-                                <div className="flex items-start gap-4">
-                                    <div className="flex-shrink-0 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                                        <CheckCircle2 className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-white/95 font-medium">Expert advice from top doctors</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-4">
-                                    <div className="flex-shrink-0 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                                        <Clock className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-white/95 font-medium">Available 24/7 on any device</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-4">
-                                    <div className="flex-shrink-0 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                                        <MessageCircle className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-white/95 font-medium">Private questions answered within 24 hrs</p>
-                                    </div>
-                                </div>
+            <div className="w-full max-w-5xl relative z-10 flex flex-col lg:flex-row gap-0 rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
+                {/* Left Panel - Hero Info */}
+                <div className="lg:w-5/12 bg-gradient-to-br from-[#0a0f1e] to-[#121a2e] p-10 flex flex-col justify-between border-r border-white/5">
+                    <div>
+                        <div className="flex items-center gap-3 mb-10 hover:opacity-80 transition-opacity cursor-pointer" onClick={() => router.push('/')}>
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg">
+                                <Stethoscope className="w-5 h-5 text-white" />
                             </div>
+                            <span className="text-xl font-bold bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
+                                Medical Agent
+                            </span>
+                        </div>
+
+                        <h1 className="text-3xl font-bold text-white mb-6 leading-tight">
+                            Start your journey with<br />
+                            <span className="text-cyan-400">Better Healthcare AI</span>
+                        </h1>
+
+                        <div className="space-y-6 mt-6">
+                            {[
+                                { icon: <CheckCircle2 className="w-5 h-5" />, title: 'Join 500+ Patients', desc: 'Trusting AI for preliminary image review.' },
+                                { icon: <ShieldCheck className="w-5 h-5" />, title: 'Hipaa Aware Design', desc: 'Security built into every component.' },
+                                { icon: <Sparkles className="w-5 h-5" />, title: 'Instant Account', desc: 'Free forever for basic analysis.' },
+                            ].map((item, i) => (
+                                <div key={i} className="flex gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-cyan-400 shrink-0">
+                                        {item.icon}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-white">{item.title}</h3>
+                                        <p className="text-xs text-gray-400 mt-1">{item.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Right Panel - Register Form */}
-                    <div className="lg:w-3/5 p-8 lg:p-12">
-                        {/* User Type Tabs */}
-                        <div className="flex gap-4 mb-8">
+                    <div className="mt-8 pt-6 border-t border-white/5">
+                        <div className="flex items-center gap-4 text-xs text-gray-400">
+                            <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Secure</span>
+                            <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Verified</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Panel - Register Form */}
+                <div className="lg:w-7/12 bg-[#030712]/40 backdrop-blur-xl p-8 sm:p-12">
+                    <div className="max-w-md mx-auto">
+                        <div className="mb-8 text-center lg:text-left">
+                            <h2 className="text-3xl font-bold text-white mb-2">Create Account</h2>
+                            <p className="text-gray-400">Start analyzing your medical reports today.</p>
+                        </div>
+
+                        {/* User Type Switcher */}
+                        <div className="flex p-1 bg-white/5 rounded-2xl mb-8">
                             <button
                                 onClick={() => setUserType('patient')}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${userType === 'patient'
-                                    ? 'bg-cyan-50 text-cyan-600 font-medium'
-                                    : 'text-gray-400 hover:text-gray-600'
+                                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${userType === 'patient' ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'
                                     }`}
                             >
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${userType === 'patient' ? 'bg-cyan-500' : 'bg-gray-200'
-                                    }`}>
-                                    <span className="text-white text-sm">👤</span>
-                                </div>
                                 Patient
                             </button>
                             <button
                                 onClick={() => setUserType('doctor')}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${userType === 'doctor'
-                                    ? 'bg-cyan-50 text-cyan-600 font-medium'
-                                    : 'text-gray-400 hover:text-gray-600'
+                                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${userType === 'doctor' ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'
                                     }`}
                             >
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${userType === 'doctor' ? 'bg-cyan-500' : 'bg-gray-200'
-                                    }`}>
-                                    <span className="text-white text-sm">👨‍⚕️</span>
-                                </div>
-                                Doctor
+                                Professional
                             </button>
                         </div>
 
-                        {/* Welcome Text */}
-                        <div className="mb-8">
-                            <h2 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h2>
-                            <p className="text-gray-500">Sign up to get started with expert medical advice</p>
-                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <Input
+                                label="Full Name"
+                                type="text"
+                                placeholder="John Doe"
+                                value={formData.full_name}
+                                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                                required
+                                icon={<User className="w-4 h-4" />}
+                                className="bg-white/5 border-white/10 h-12"
+                            />
 
-                        {/* Register Form */}
-                        <form onSubmit={handleSubmit} className="space-y-5">
-                            {/* Full Name Field */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Full Name
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="John Doe"
-                                    value={formData.full_name}
-                                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                                    required
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all bg-white text-gray-800 placeholder-gray-400"
-                                />
-                            </div>
+                            <Input
+                                label="Email Address"
+                                type="email"
+                                placeholder="name@example.com"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                required
+                                icon={<Mail className="w-4 h-4" />}
+                                className="bg-white/5 border-white/10 h-12"
+                            />
 
-                            {/* Email Field */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Email Address
-                                </label>
-                                <input
-                                    type="email"
-                                    placeholder="your@email.com"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    required
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all bg-white text-gray-800 placeholder-gray-400"
-                                />
-                            </div>
-
-                            {/* Password Field */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Password
-                                </label>
-                                <input
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Input
+                                    label="Password"
                                     type="password"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                     required
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all bg-white text-gray-800 placeholder-gray-400"
+                                    icon={<Lock className="w-4 h-4" />}
+                                    className="bg-white/5 border-white/10 h-12"
                                 />
-                            </div>
-
-                            {/* Confirm Password Field */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Confirm Password
-                                </label>
-                                <input
+                                <Input
+                                    label="Confirm"
                                     type="password"
                                     placeholder="••••••••"
                                     value={formData.confirmPassword}
                                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                                     required
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all bg-white text-gray-800 placeholder-gray-400"
+                                    icon={<Lock className="w-4 h-4" />}
+                                    className="bg-white/5 border-white/10 h-12"
                                 />
                             </div>
 
-                            {/* Error Message */}
                             {error && (
-                                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                                    <p className="text-sm text-red-600">{error}</p>
+                                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 my-4">
+                                    <X className="w-5 h-5 text-red-400 shrink-0" />
+                                    <p className="text-sm text-red-400">{error}</p>
                                 </div>
                             )}
 
-                            {/* Create Account Button */}
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white py-3 px-6 rounded-lg font-medium hover:from-teal-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/30"
-                            >
-                                {isLoading ? (
-                                    <span className="flex items-center justify-center gap-2">
-                                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                                        Creating Account...
-                                    </span>
-                                ) : (
-                                    'Create Account'
-                                )}
-                            </button>
-
-                            {/* Sign In Link */}
-                            <p className="text-center text-gray-600">
-                                Already have an account?{' '}
-                                <Link
-                                    href="/auth/login"
-                                    className="text-cyan-600 hover:text-cyan-700 font-medium underline"
+                            <div className="pt-2">
+                                <Button
+                                    type="submit"
+                                    variant="primary"
+                                    isLoading={isLoading}
+                                    className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl overflow-hidden relative group"
                                 >
-                                    Sign in
+                                    <span className="relative z-10 flex items-center justify-center gap-2">
+                                        Join Now <ArrowLeft className="w-4 h-4 rotate-180" />
+                                    </span>
+                                    <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[0%] transition-transform duration-500" />
+                                </Button>
+                            </div>
+
+                            <p className="text-center text-sm text-gray-500 pt-4">
+                                Already have an account?{' '}
+                                <Link href="/auth/login" className="text-cyan-400 font-bold hover:underline transition-all">
+                                    Sign In
                                 </Link>
                             </p>
                         </form>

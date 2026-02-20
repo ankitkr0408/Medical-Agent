@@ -25,6 +25,8 @@ class AnalysisResponse(BaseModel):
     findings: List[str]
     keywords: List[str]
     doctor_recommendations: dict
+    pubmed_articles: Optional[List[dict]] = []
+    clinical_trials: Optional[List[dict]] = []
     date: str
     filename: str
 

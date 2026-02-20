@@ -12,9 +12,14 @@ const apiClient = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        if (typeof window !== 'undefined') {
+            const authStorage = localStorage.getItem('auth-storage');
+            if (authStorage) {
+                const { state } = JSON.parse(authStorage);
+                if (state?.token) {
+                    config.headers.Authorization = `Bearer ${state.token}`;
+                }
+            }
         }
         return config;
     },
@@ -26,10 +31,10 @@ apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Clear token and redirect to login
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user');
-            window.location.href = '/auth/login';
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('auth-storage');
+                window.location.href = '/auth/login';
+            }
         }
         return Promise.reject(error);
     }
@@ -53,9 +58,8 @@ export const authAPI = {
     },
 
     logout: async () => {
-        await apiClient.post('/api/auth/logout');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
+        // Zustand store handle the state, we just call the API if needed
+        // await apiClient.post('/api/auth/logout'); 
     },
 };
 
@@ -128,22 +132,28 @@ export const consultationAPI = {
 
 // Q&A API
 export const qaAPI = {
-    createSession: async (data: { room_name: string; creator_name: string }) => {
-        const response = await apiClient.post('/api/qa/create', data);
+    createSession: async (data: { title: string; user_name: string }) => {
+        // Backend expects room_name, frontend uses title
+        const response = await apiClient.post('/api/qa/create', {
+            room_name: data.title,
+            creator_name: data.user_name
+        });
         return response.data;
     },
 
-    getSessions: async () => {
+    getHistory: async () => {
         const response = await apiClient.get('/api/qa/sessions');
+        return { sessions: response.data }; // Match frontend expecting { sessions: [] }
+    },
+
+    askQuestion: async (sessionId: string, data: { question: string; user_name: string }) => {
+        const response = await apiClient.post(`/api/qa/${sessionId}/question`, {
+            question: data.question
+        });
         return response.data;
     },
 
-    askQuestion: async (sessionId: string, question: string) => {
-        const response = await apiClient.post(`/api/qa/${sessionId}/question`, { question });
-        return response.data;
-    },
-
-    getHistory: async (sessionId: string) => {
+    getSession: async (sessionId: string) => {
         const response = await apiClient.get(`/api/qa/${sessionId}/history`);
         return response.data;
     },
@@ -157,9 +167,9 @@ export const reportsAPI = {
     },
 
     generateReport: async (analysisId: string, title?: string) => {
-        const response = await apiClient.post('/api/reports/generate', {
-            analysis_id: analysisId,
-            title
+        // Calls the Analysis PDF report endpoint
+        const response = await apiClient.post(`/api/analysis/${analysisId}/report`, {
+            include_references: true,
         });
         return response.data;
     },
