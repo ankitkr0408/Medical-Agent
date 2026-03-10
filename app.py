@@ -4,6 +4,7 @@ import io
 from PIL import Image
 from datetime import datetime
 import base64
+import JWT
 from dotenv import load_dotenv
 
 # Load environment variables
