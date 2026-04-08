@@ -1,0 +1,256 @@
+// Prisma Schema - Translated from Python MongoDB structure
+// Preserves all data models from db.py
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// User model - from auth_system.py
+model User {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  email             String    @unique
+  password          String
+  name              String
+  role              Role      @default(PATIENT)
+  medicalLicense    String?
+  specialization    String?
+  emailVerified     DateTime?
+  image             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastLogin         DateTime?
+  
+  // Relations
+  analyses          Analysis[]
+  chatRooms         ChatRoom[]
+  qaRooms           QARoom[]
+  messages          Message[]
+  consultations     Consultation[]
+  accounts          Account[]
+  sessions          Session[]
+  
+  @@map("users")
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+// NextAuth models
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Analysis model - from utils_simple.py analyze_image()
+model Analysis {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String    @db.ObjectId
+  user              User      @relation(fields: [userId], references: [id])
+  
+  filename          String
+  fileUrl           String
+  fileType          FileType
+  
+  // AI Analysis results - from analyze_image() return
+  analysis          String    // Full analysis text
+  findings          String[]  // Extracted findings
+  keywords          String[]  // Extracted keywords
+  severity          Severity?
+  
+  // XAI heatmap - from generate_heatmap()
+  heatmapUrl        String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  reports           Report[]
+  
+  @@map("analyses")
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum FileType {
+  IMAGE
+  DICOM
+  NIFTI
+}
+
+enum Severity {
+  NORMAL
+  MILD
+  MODERATE
+  SEVERE
+  CRITICAL
+}
+
+// ChatRoom model - from chat_system.py
+model ChatRoom {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String    @db.ObjectId
+  user              User      @relation(fields: [userId], references: [id])
+  
+  name              String
+  description       String
+  type              ChatType  @default(CASE_DISCUSSION)
+  
+  participants      String[]  // Array of participant names
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  messages          Message[]
+  consultation      Consultation?
+  
+  @@map("chat_rooms")
+  @@index([userId])
+}
+
+enum ChatType {
+  CASE_DISCUSSION
+  CONSULTATION
+  TEAM_CHAT
+}
+
+// Message model - from chat_system.py add_message()
+model Message {
+  id                String      @id @default(auto()) @map("_id") @db.ObjectId
+  chatRoomId        String      @db.ObjectId
+  chatRoom          ChatRoom    @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  
+  userId            String      @db.ObjectId
+  user              User        @relation(fields: [userId], references: [id])
+  
+  content           String
+  type              MessageType @default(TEXT)
+  
+  createdAt         DateTime    @default(now())
+  
+  @@map("messages")
+  @@index([chatRoomId])
+  @@index([createdAt])
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+  AI_RESPONSE
+  ANNOTATION
+}
+
+// Consultation model - from chat_system.py consultation workflow
+model Consultation {
+  id                String              @id @default(auto()) @map("_id") @db.ObjectId
+  chatRoomId        String              @unique @db.ObjectId
+  chatRoom          ChatRoom            @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  
+  userId            String              @db.ObjectId
+  user              User                @relation(fields: [userId], references: [id])
+  
+  stage             ConsultationStage   @default(INITIAL)
+  specialistOpinions Json[]             // Array of specialist responses
+  summary           String?             // Final summary from Chief Medical Officer
+  
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  @@map("consultations")
+}
+
+enum ConsultationStage {
+  INITIAL
+  SPECIALISTS
+  SUMMARY
+  COMPLETE
+}
+
+// QARoom model - from report_qa_chat.py
+model QARoom {
+  id                String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String      @db.ObjectId
+  user              User        @relation(fields: [userId], references: [id])
+  
+  name              String
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  qaMessages        QAMessage[]
+  
+  @@map("qa_rooms")
+  @@index([userId])
+}
+
+// QAMessage model - from report_qa_chat.py RAG system
+model QAMessage {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  qaRoomId          String    @db.ObjectId
+  qaRoom            QARoom    @relation(fields: [qaRoomId], references: [id], onDelete: Cascade)
+  
+  question          String?
+  answer            String?
+  contexts          String[]  // Retrieved contexts from RAG
+  
+  createdAt         DateTime  @default(now())
+  
+  @@map("qa_messages")
+  @@index([qaRoomId])
+}
+
+// Report model - from utils_simple.py generate_report()
+model Report {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId        String    @db.ObjectId
+  analysis          Analysis  @relation(fields: [analysisId], references: [id])
+  
+  pdfUrl            String
+  includeReferences Boolean   @default(true)
+  
+  createdAt         DateTime  @default(now())
+  
+  @@map("reports")
+  @@index([analysisId])
+}
