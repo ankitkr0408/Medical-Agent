@@ -5,6 +5,30 @@ import { useSession } from 'next-auth/react';
 
 type Stage = 'initial' | 'specialists' | 'summary' | 'complete';
 
+// Enhanced markdown formatter for medical chat messages
+function formatMarkdown(text: string) {
+    return text
+        // Bold text: **text** -> <strong>text</strong>
+        .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+        // Italic text: *text* -> <em>text</em>
+        .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
+        // Headers: ### text -> <h3>text</h3>
+        .replace(/^###\s+(.+)$/gm, '<h3 class="font-bold text-base mt-4 mb-2 text-gray-900">$1</h3>')
+        .replace(/^##\s+(.+)$/gm, '<h2 class="font-bold text-lg mt-4 mb-2 text-gray-900">$1</h2>')
+        // Numbered lists: 1. text -> proper list items with better spacing
+        .replace(/^(\d+)\.\s+\*\*(.+?)\*\*(.*)$/gm, '<div class="ml-4 my-2 flex"><span class="font-semibold text-gray-700 mr-2">$1.</span><span><strong class="font-semibold text-gray-900">$2</strong>$3</span></div>')
+        .replace(/^(\d+)\.\s+(.+)$/gm, '<div class="ml-4 my-2 flex"><span class="font-semibold text-gray-700 mr-2">$1.</span><span>$2</span></div>')
+        // Bullet points: - text -> proper list items with round bullets
+        .replace(/^-\s+\*\*(.+?)\*\*(.*)$/gm, '<div class="ml-4 my-2 flex"><span class="text-gray-600 mr-2 text-lg leading-none">●</span><span><strong class="font-semibold text-gray-900">$1</strong>$2</span></div>')
+        .replace(/^-\s+(.+)$/gm, '<div class="ml-4 my-2 flex"><span class="text-gray-600 mr-2 text-lg leading-none">●</span><span>$1</span></div>')
+        // Code blocks: `code` -> <code>code</code>
+        .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-purple-700">$1</code>')
+        // Paragraphs: double line breaks
+        .replace(/\n\n/g, '<br/><br/>')
+        // Single line breaks
+        .replace(/\n/g, '<br/>');
+}
+
 interface Room {
     id: string;
     description: string;
@@ -45,7 +69,11 @@ export default function ChatTab() {
     const [creating, setCreating] = useState(false);
     const [statusMsg, setStatusMsg] = useState('');
     const [progress, setProgress] = useState(0);
+    const [sendingMessage, setSendingMessage] = useState(false);
     const bottomRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const [isUserScrolling, setIsUserScrolling] = useState(false);
+    const prevMessagesLengthRef = useRef(0);
 
     useEffect(() => { loadRooms(); }, []);
 
@@ -57,8 +85,12 @@ export default function ChatTab() {
     }, [currentRoom?.id]);
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        // Only auto-scroll if user is not manually scrolling and new messages arrived
+        if (!isUserScrolling && messages.length > prevMessagesLengthRef.current) {
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+        prevMessagesLengthRef.current = messages.length;
+    }, [messages, isUserScrolling]);
 
     const loadRooms = async () => {
         const res = await fetch('/api/chat/rooms');
@@ -115,12 +147,22 @@ export default function ChatTab() {
         if (!input.trim() || !currentRoom) return;
         const msg = input;
         setInput('');
+        setSendingMessage(true);
+        setIsUserScrolling(false); // Allow auto-scroll for new messages
         await fetch(`/api/chat/${currentRoom.id}/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: msg }),
         });
         await loadMessages();
+        setSendingMessage(false);
+    };
+
+    const handleScroll = () => {
+        if (!messagesContainerRef.current) return;
+        const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+        setIsUserScrolling(!isAtBottom);
     };
 
     const submitAnnotation = async () => {
@@ -192,19 +234,36 @@ export default function ChatTab() {
                             rooms.length > 0 ? (
                                 <div className="space-y-3">
                                     <label className="text-sm font-medium text-gray-700">Select Case</label>
-                                    <select
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                        onChange={e => {
-                                            const room = rooms.find(r => r.id === e.target.value);
-                                            if (room) setCurrentRoom(room);
-                                        }}
-                                        defaultValue=""
-                                    >
-                                        <option value="" disabled>-- Select a case --</option>
-                                        {roomOptions.map(o => (
-                                            <option key={o.room.id} value={o.room.id}>{o.label}</option>
+                                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                                        {rooms.map(room => (
+                                            <div key={room.id} className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                                                <button
+                                                    onClick={() => setCurrentRoom(room)}
+                                                    className="flex-1 text-left"
+                                                >
+                                                    <div className="font-semibold text-sm text-gray-900">{room.description}</div>
+                                                    <div className="text-xs text-gray-500">by {room.creator} • {room.participants} participants</div>
+                                                </button>
+                                                <button
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm('Delete this discussion?')) {
+                                                            try {
+                                                                await fetch(`/api/chat/${room.id}`, { method: 'DELETE' });
+                                                                await loadRooms();
+                                                            } catch (error) {
+                                                                console.error('Error deleting room:', error);
+                                                                alert('Failed to delete discussion');
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition"
+                                                >
+                                                    🗑️ Delete
+                                                </button>
+                                            </div>
                                         ))}
-                                    </select>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-800 text-sm">
@@ -244,7 +303,27 @@ export default function ChatTab() {
                             <h3 className="text-lg font-bold text-gray-900">Case Discussion: {currentRoom.description}</h3>
                             <p className="text-sm text-gray-500">Created by {currentRoom.creator} • {currentRoom.participants} participants</p>
                         </div>
-                        <button onClick={() => setCurrentRoom(null)} className="text-sm text-gray-400 hover:text-gray-600 underline">← Back</button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={async () => {
+                                    if (confirm('Are you sure you want to delete this discussion? This action cannot be undone.')) {
+                                        try {
+                                            await fetch(`/api/chat/${currentRoom.id}`, { method: 'DELETE' });
+                                            setCurrentRoom(null);
+                                            setMessages([]);
+                                            await loadRooms();
+                                        } catch (error) {
+                                            console.error('Error deleting room:', error);
+                                            alert('Failed to delete discussion');
+                                        }
+                                    }
+                                }}
+                                className="text-sm text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1 rounded-lg transition"
+                            >
+                                🗑️ Delete
+                            </button>
+                            <button onClick={() => setCurrentRoom(null)} className="text-sm text-gray-400 hover:text-gray-600 underline">← Back</button>
+                        </div>
                     </div>
 
                     {/* Stage info — matches Streamlit st.info() */}
@@ -302,25 +381,49 @@ export default function ChatTab() {
 
                     {/* Messages — matches Streamlit st.chat_message */}
                     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                        <div className="h-[380px] overflow-y-auto p-4 space-y-3">
+                        <div
+                            ref={messagesContainerRef}
+                            onScroll={handleScroll}
+                            className="h-[380px] overflow-y-auto p-4 space-y-3"
+                        >
                             {messages.map(msg => (
                                 <div key={msg.id} className="flex gap-3 items-start">
                                     <span className="text-2xl flex-shrink-0 mt-0.5">{avatar(msg)}</span>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-semibold text-gray-600 mb-1">{msg.user}</p>
-                                        <div className={`text-sm rounded-2xl px-4 py-2 whitespace-pre-wrap break-words ${msg.type === 'system' ? 'bg-blue-50 text-blue-800 border border-blue-200' :
-                                            msg.type === 'ai_response' ? 'bg-green-50 text-gray-800 border border-green-200' :
-                                                msg.type === 'annotation' ? 'bg-yellow-50 text-gray-800 border border-yellow-200' :
-                                                    'bg-gray-100 text-gray-800'
-                                            }`}>
-                                            {msg.content}
-                                        </div>
+                                        <div
+                                            className={`text-sm rounded-2xl px-4 py-2 break-words ${msg.type === 'system' ? 'bg-blue-50 text-blue-800 border border-blue-200' :
+                                                msg.type === 'ai_response' ? 'bg-green-50 text-gray-800 border border-green-200' :
+                                                    msg.type === 'annotation' ? 'bg-yellow-50 text-gray-800 border border-yellow-200' :
+                                                        'bg-gray-100 text-gray-800'
+                                                }`}
+                                            dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
+                                        />
                                         <p className="text-xs text-gray-400 mt-1">
                                             {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : ''}
                                         </p>
                                     </div>
                                 </div>
                             ))}
+
+                            {/* Thinking indicator when message is being processed */}
+                            {sendingMessage && (
+                                <div className="flex gap-3 items-start">
+                                    <span className="text-2xl flex-shrink-0 mt-0.5">🤖</span>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-semibold text-gray-600 mb-1">AI Assistant</p>
+                                        <div className="bg-purple-50 border border-purple-200 rounded-2xl px-4 py-3 flex items-center gap-2">
+                                            <div className="flex gap-1">
+                                                <span className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                                <span className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                                <span className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                            </div>
+                                            <span className="text-sm text-purple-700">Thinking...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div ref={bottomRef} />
                         </div>
 

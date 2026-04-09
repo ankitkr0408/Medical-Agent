@@ -5,6 +5,30 @@ import { useSession } from 'next-auth/react';
 interface QARoom { id: string; name: string; creator: string; created_at: string; }
 interface QAMessage { id: string; user: string; content: string; timestamp: string; }
 
+// Enhanced markdown formatter for medical Q&A messages
+function formatMarkdown(text: string) {
+  return text
+    // Bold text: **text** -> <strong>text</strong>
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+    // Italic text: *text* -> <em>text</em>
+    .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
+    // Headers: ### text -> <h3>text</h3>
+    .replace(/^###\s+(.+)$/gm, '<h3 class="font-bold text-base mt-3 mb-1.5 text-gray-900">$1</h3>')
+    .replace(/^##\s+(.+)$/gm, '<h2 class="font-bold text-lg mt-3 mb-1.5 text-gray-900">$1</h2>')
+    // Numbered lists: 1. text -> proper list items with better spacing
+    .replace(/^(\d+)\.\s+\*\*(.+?)\*\*(.*)$/gm, '<div class="ml-4 my-1 flex"><span class="font-semibold text-gray-700 mr-2">$1.</span><span><strong class="font-semibold text-gray-900">$2</strong>$3</span></div>')
+    .replace(/^(\d+)\.\s+(.+)$/gm, '<div class="ml-4 my-1 flex"><span class="font-semibold text-gray-700 mr-2">$1.</span><span>$2</span></div>')
+    // Bullet points: - text -> proper list items with round bullets
+    .replace(/^-\s+\*\*(.+?)\*\*(.*)$/gm, '<div class="ml-4 my-1 flex"><span class="text-gray-600 mr-2 text-base leading-tight">●</span><span><strong class="font-semibold text-gray-900">$1</strong>$2</span></div>')
+    .replace(/^-\s+(.+)$/gm, '<div class="ml-4 my-1 flex"><span class="text-gray-600 mr-2 text-base leading-tight">●</span><span>$1</span></div>')
+    // Code blocks: `code` -> <code>code</code>
+    .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-purple-700">$1</code>')
+    // Paragraphs: double line breaks (reduce spacing)
+    .replace(/\n\n/g, '<br/>')
+    // Single line breaks (reduce spacing)
+    .replace(/\n/g, '<br/>');
+}
+
 export default function QATab() {
   const { data: session } = useSession();
   const [rooms, setRooms] = useState<QARoom[]>([]);
@@ -15,13 +39,20 @@ export default function QATab() {
   const [roomName, setRoomName] = useState('');
   const [tab, setTab] = useState<'join' | 'create'>('join');
   const [creating, setCreating] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const prevMessagesLengthRef = useRef(0);
 
   useEffect(() => { loadRooms(); }, []);
   useEffect(() => { if (currentRoom) loadMessages(); }, [currentRoom?.id]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    // Only auto-scroll if user is not manually scrolling and new messages arrived
+    if (!isUserScrolling && messages.length > prevMessagesLengthRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevMessagesLengthRef.current = messages.length;
+  }, [messages, isUserScrolling]);
 
   const loadRooms = async () => {
     const res = await fetch('/api/qa/rooms');
@@ -65,6 +96,7 @@ export default function QATab() {
     const q = input.trim();
     setInput('');
     setSending(true);
+    setIsUserScrolling(false); // Allow auto-scroll for new messages
     setMessages(prev => [...prev, { id: `tmp-${Date.now()}`, user: session?.user?.name || 'User', content: q, timestamp: new Date().toISOString() }]);
     try {
       await fetch(`/api/qa/${currentRoom.id}/messages`, {
@@ -76,14 +108,11 @@ export default function QATab() {
     } finally { setSending(false); }
   };
 
-  const handleDelete = async () => {
-    if (!currentRoom) return;
-    setDeleting(true);
-    try {
-      await fetch(`/api/qa/${currentRoom.id}`, { method: 'DELETE' });
-      setCurrentRoom(null); setMessages([]); setShowSettings(false);
-      await loadRooms();
-    } finally { setDeleting(false); }
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    setIsUserScrolling(!isAtBottom);
   };
 
   return (
@@ -104,12 +133,37 @@ export default function QATab() {
             {rooms.length === 0
               ? <p className="text-sm text-gray-400 text-center py-6">No active Q&A rooms. Create a new one!</p>
               : rooms.map(room => (
-                <button key={room.id} onClick={() => { setCurrentRoom(room); loadMessages(room); }}
-                  className={`w-full text-left p-3 rounded-lg border transition ${currentRoom?.id === room.id ? 'bg-green-50 border-green-400' : 'bg-gray-50 border-transparent hover:bg-gray-100'}`}>
-                  <div className="font-semibold text-sm text-gray-900 truncate">{room.name}</div>
-                  <div className="text-xs text-gray-500">by {room.creator}</div>
-                  <div className="text-xs text-gray-400">{String(room.created_at).slice(0, 10)}</div>
-                </button>
+                <div key={room.id} className={`flex items-center gap-2 p-3 rounded-lg border transition ${currentRoom?.id === room.id ? 'bg-green-50 border-green-400' : 'bg-gray-50 border-transparent hover:bg-gray-100'}`}>
+                  <button
+                    onClick={() => { setCurrentRoom(room); loadMessages(room); }}
+                    className="flex-1 text-left"
+                  >
+                    <div className="font-semibold text-sm text-gray-900 truncate">{room.name}</div>
+                    <div className="text-xs text-gray-500">by {room.creator}</div>
+                    <div className="text-xs text-gray-400">{String(room.created_at).slice(0, 10)}</div>
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm('Delete this Q&A room?')) {
+                        try {
+                          await fetch(`/api/qa/${room.id}`, { method: 'DELETE' });
+                          if (currentRoom?.id === room.id) {
+                            setCurrentRoom(null);
+                            setMessages([]);
+                          }
+                          await loadRooms();
+                        } catch (error) {
+                          console.error('Error deleting room:', error);
+                          alert('Failed to delete Q&A room');
+                        }
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition"
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
               ))
             }
           </div>
@@ -138,20 +192,14 @@ export default function QATab() {
                   <h3 className="font-bold text-gray-900">Q&A Room: {currentRoom.name}</h3>
                   <p className="text-xs text-gray-500">Created by {currentRoom.creator} on {String(currentRoom.created_at).slice(0, 10)}</p>
                 </div>
-                <button onClick={() => setShowSettings(!showSettings)} className="text-gray-400 hover:text-gray-600 text-sm px-2 py-1 rounded">⚙️ Settings</button>
               </div>
-              {showSettings && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm text-gray-600 mb-2">Delete this Q&A room permanently?</p>
-                  <button onClick={handleDelete} disabled={deleting}
-                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50">
-                    {deleting ? 'Deleting...' : '🗑️ Delete Q&A Room'}
-                  </button>
-                </div>
-              )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div
+              ref={messagesContainerRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto p-4 space-y-3"
+            >
               {messages.map(msg => {
                 const isAI = msg.user === 'Report QA System';
                 return (
@@ -159,9 +207,10 @@ export default function QATab() {
                     <span className="text-2xl flex-shrink-0">{isAI ? '🤖' : '👨‍⚕️'}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-600 mb-1">{msg.user}</p>
-                      <div className={`text-sm rounded-2xl px-4 py-2 whitespace-pre-wrap break-words ${isAI ? 'bg-green-50 border border-green-200 text-gray-800' : 'bg-gray-100 text-gray-800'}`}>
-                        {msg.content}
-                      </div>
+                      <div
+                        className={`text-sm rounded-2xl px-4 py-2 break-words ${isAI ? 'bg-green-50 border border-green-200 text-gray-800' : 'bg-gray-100 text-gray-800'}`}
+                        dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
+                      />
                       <p className="text-xs text-gray-400 mt-1">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : ''}</p>
                     </div>
                   </div>

@@ -167,11 +167,11 @@ export default function DashboardTab({ setActiveTab }: DashboardTabProps) {
       {/* Tips */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          💡 Tips for {userRole === 'patient' ? 'Patients' : 'Medical Professionals'}
+          💡 Tips for {userRole === 'PATIENT' ? 'Patients' : 'Medical Professionals'}
         </h3>
         <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6">
           <ul className="space-y-2 text-sm text-gray-700">
-            {userRole === 'patient' ? (
+            {userRole === 'PATIENT' ? (
               <>
                 <li>🔒 <strong>Privacy First:</strong> Your medical images are processed securely</li>
                 <li>👨‍⚕️ <strong>AI Assistance:</strong> Our AI provides insights, but always consult your doctor</li>

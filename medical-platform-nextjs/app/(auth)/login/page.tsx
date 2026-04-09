@@ -34,12 +34,12 @@ export default function LoginPage() {
       {/* Left panel */}
       <div className="hidden lg:flex flex-col justify-center items-center flex-1 p-16 relative z-10">
         <div className="text-center animate-fade-up">
-          <div className="text-8xl mb-6 animate-float">🏥</div>
+          <div className="text-8xl mb-6 animate-float">🧠</div>
           <h1 className="text-5xl font-black text-white mb-4 leading-tight">
-            Medical AI<br /><span className="text-gradient" style={{ background: 'linear-gradient(135deg,#A78BFA,#38BDF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Platform</span>
+            Health<span className="text-gradient" style={{ background: 'linear-gradient(135deg,#A78BFA,#38BDF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>IQ</span>
           </h1>
           <p className="text-slate-300 text-lg max-w-sm leading-relaxed">
-            AI-powered medical image analysis, multidisciplinary consultation, and intelligent Q&A for healthcare professionals.
+            AI-powered medical intelligence for healthcare professionals and patients.
           </p>
           <div className="mt-10 grid grid-cols-2 gap-4 max-w-xs mx-auto">
             {[['🔬', 'AI Analysis'], ['👨‍⚕️', 'Specialists'], ['📊', 'Reports'], ['💬', 'Collaboration']].map(([icon, label]) => (
@@ -56,8 +56,8 @@ export default function LoginPage() {
       <div className="flex flex-col justify-center items-center flex-1 p-8 relative z-10">
         <div className="glass rounded-3xl p-8 w-full max-w-md shadow-2xl animate-fade-up" style={{ animationDelay: '.1s' }}>
           <div className="text-center mb-8">
-            <div className="text-4xl mb-3 lg:hidden">🏥</div>
-            <h2 className="text-2xl font-bold text-slate-800">Welcome back</h2>
+            <div className="text-4xl mb-3 lg:hidden">🧠</div>
+            <h2 className="text-2xl font-bold text-slate-800">Welcome to HealthIQ</h2>
             <p className="text-slate-500 text-sm mt-1">Sign in to your medical account</p>
           </div>
 
