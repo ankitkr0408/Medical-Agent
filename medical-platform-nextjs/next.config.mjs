@@ -1,10 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // Remove 'standalone' for Vercel - Vercel handles this automatically
+  // output: 'standalone',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.amazonaws.com' },
       { protocol: 'https', hostname: 'uploadthing.com' },
+      { protocol: 'https', hostname: '**.vercel.app' },
     ],
   },
   experimental: {
