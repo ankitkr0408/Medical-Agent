@@ -26,10 +26,25 @@ export async function middleware(req: NextRequest) {
   if (!isProtected) return NextResponse.next()
 
   // getToken only reads the JWT cookie - no DB, no Node.js modules, Edge-safe
-  const token = await getToken({
+  // Enforce secure cookies on Vercel/Production to match how NextAuth sets them with the __Secure- prefix
+  const isSecureEnv = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1' || req.nextUrl.protocol === 'https:';
+  
+  let token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
-  })
+    secureCookie: isSecureEnv,
+  });
+
+  // Fallback for next-auth v5 beta cookie consistency on Vercel Edge Runtime
+  if (!token && isSecureEnv) {
+    token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: true,
+      // @ts-ignore - Fallback for next-auth v5 cookie salt behavior
+      salt: '__Secure-authjs.session-token'
+    });
+  }
 
   if (!token) {
     return NextResponse.redirect(new URL('/login', req.url))
