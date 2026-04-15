@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import NearbyDoctors from './NearbyDoctors';
 
 type Stage = 'initial' | 'specialists' | 'summary' | 'complete';
 
@@ -64,7 +65,7 @@ export default function ChatTab() {
     const [annotation, setAnnotation] = useState('');
     const [showAnnotation, setShowAnnotation] = useState(false);
     const [caseDesc, setCaseDesc] = useState('');
-    const [activeTab, setActiveTab] = useState<'join' | 'create'>('join');
+    const [activeTab, setActiveTab] = useState<'join' | 'create' | 'doctors'>('join');
     const [consultLoading, setConsultLoading] = useState(false);
     const [creating, setCreating] = useState(false);
     const [statusMsg, setStatusMsg] = useState('');
@@ -217,14 +218,18 @@ export default function ChatTab() {
         <div className="space-y-4">
             <h2 className="text-xl font-bold text-gray-900">👨‍⚕️👩‍⚕️ Multi-Doctor Collaboration</h2>
 
-            {/* Tabs: Join Existing / Create New — matches Streamlit st.tabs */}
+            {/* Tabs: Join Existing / Create New / Find Doctors */}
             {!currentRoom && (
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                     <div className="flex border-b border-gray-200">
-                        {(['join', 'create'] as const).map(t => (
-                            <button key={t} onClick={() => setActiveTab(t)}
-                                className={`flex-1 py-3 text-sm font-medium transition ${activeTab === t ? 'border-b-2 border-purple-600 text-purple-600 bg-purple-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                                {t === 'join' ? 'Join Existing Case' : 'Create New Case'}
+                        {([
+                            { key: 'join', label: '🔗 Join Case' },
+                            { key: 'create', label: '➕ Create Case' },
+                            { key: 'doctors', label: '📍 Find Doctors' },
+                        ] as const).map(t => (
+                            <button key={t.key} onClick={() => setActiveTab(t.key)}
+                                className={`flex-1 py-3 text-sm font-medium transition ${activeTab === t.key ? 'border-b-2 border-purple-600 text-purple-600 bg-purple-50' : 'text-gray-600 hover:bg-gray-50'}`}>
+                                {t.label}
                             </button>
                         ))}
                     </div>
@@ -288,6 +293,11 @@ export default function ChatTab() {
                                     disabled={creating || !caseDesc.trim()}
                                     className="w-full py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50"
                                 >{creating ? 'Creating...' : 'Create Discussion'}</button>
+                            </div>
+                        )}
+                        {activeTab === 'doctors' && (
+                            <div className="space-y-3">
+                                <NearbyDoctors />
                             </div>
                         )}
                     </div>

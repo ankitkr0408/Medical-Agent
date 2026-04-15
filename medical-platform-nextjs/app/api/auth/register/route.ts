@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
             success: true,
             user: { user_id: userId, full_name, email, role: medical_license ? 'doctor' : (role || 'patient') },
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('Registration error:', error)
-        return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
+        return NextResponse.json({ error: error?.message || 'Failed to create account' }, { status: 500 })
     }
 }
