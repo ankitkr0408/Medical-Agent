@@ -240,7 +240,7 @@ export default function ChatTab() {
                                 <div className="space-y-3">
                                     <label className="text-sm font-medium text-gray-700">Select Case</label>
                                     <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                                        {rooms.map(room => (
+                                        {rooms.map((room: Room) => (
                                             <div key={room.id} className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
                                                 <button
                                                     onClick={() => setCurrentRoom(room)}
@@ -248,6 +248,34 @@ export default function ChatTab() {
                                                 >
                                                     <div className="font-semibold text-sm text-gray-900">{room.description}</div>
                                                     <div className="text-xs text-gray-500">by {room.creator} • {room.participants} participants</div>
+                                                </button>
+                                                <button
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        const roomId = room.id;
+                                                        const roomDescription = room.description;
+                                                        const newName = prompt('Enter new case name:', roomDescription);
+                                                        if (newName && newName.trim() && newName !== roomDescription) {
+                                                            try {
+                                                                const res = await fetch(`/api/chat/${roomId}`, {
+                                                                    method: 'PATCH',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({ description: newName.trim() }),
+                                                                });
+                                                                if (res.ok) {
+                                                                    await loadRooms();
+                                                                } else {
+                                                                    alert('Failed to update case name');
+                                                                }
+                                                            } catch (error) {
+                                                                console.error('Error updating room:', error);
+                                                                alert('Failed to update case name');
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition"
+                                                >
+                                                    ✏️ Edit
                                                 </button>
                                                 <button
                                                     onClick={async (e) => {
@@ -314,6 +342,32 @@ export default function ChatTab() {
                             <p className="text-sm text-gray-500">Created by {currentRoom.creator} • {currentRoom.participants} participants</p>
                         </div>
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={async () => {
+                                    const newName = prompt('Enter new case name:', currentRoom.description);
+                                    if (newName && newName.trim() && newName !== currentRoom.description) {
+                                        try {
+                                            const res = await fetch(`/api/chat/${currentRoom.id}`, {
+                                                method: 'PATCH',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ description: newName.trim() }),
+                                            });
+                                            if (res.ok) {
+                                                setCurrentRoom({ ...currentRoom, description: newName.trim() });
+                                                await loadRooms();
+                                            } else {
+                                                alert('Failed to update case name');
+                                            }
+                                        } catch (error) {
+                                            console.error('Error updating room:', error);
+                                            alert('Failed to update case name');
+                                        }
+                                    }
+                                }}
+                                className="text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1 rounded-lg transition"
+                            >
+                                ✏️ Edit Name
+                            </button>
                             <button
                                 onClick={async () => {
                                     if (confirm('Are you sure you want to delete this discussion? This action cannot be undone.')) {
