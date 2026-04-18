@@ -389,7 +389,7 @@ export default function Home() {
                 <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>M</span>
               </div>
               <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', letterSpacing: '-0.02em' }}>
-                MediScan <span className="text-gradient">AI</span>
+                Health <span className="text-gradient">IQ</span>
               </span>
             </a>
 
@@ -490,7 +490,7 @@ export default function Home() {
                 <div className="dot" style={{ background: '#28c840' }} />
                 <div style={{ flex: 1, textAlign: 'center' }}>
                   <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace' }}>
-                    mediscan.ai/dashboard/analysis
+                    healthiq/dashboard/analysis
                   </span>
                 </div>
               </div>
@@ -761,7 +761,7 @@ export default function Home() {
                 links: [
                   { label: 'About', href: '#about' },
                   { label: 'Clinical Stories', href: '#testimonials' },
-                  { label: 'Contact', href: 'mailto:hello@mediscan.ai' },
+                  { label: 'Contact', href: 'mailto:ankit75kumar3e@gmail.com' },
                 ],
               },
               {
