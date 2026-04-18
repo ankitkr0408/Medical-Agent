@@ -4,6 +4,7 @@ import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -46,13 +47,10 @@ export default function LoginPage() {
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">M</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">MediScan AI</span>
+              <span className="text-xl font-bold text-gray-900">Health IQ</span>
             </Link>
-            <Link
-              href="/"
-              className="text-gray-600 hover:text-gray-900 transition"
-            >
-              ← Back to Home
+            <Link href="/">
+              <Button variant="ghost">← Back to Home</Button>
             </Link>
           </div>
         </div>
@@ -118,23 +116,24 @@ export default function LoginPage() {
                 />
               </div>
 
-              <button
+              <Button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full"
+                size="lg"
               >
                 {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                  <>
+                    <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                     </svg>
                     Signing in...
-                  </span>
+                  </>
                 ) : (
                   'Sign In'
                 )}
-              </button>
+              </Button>
             </form>
 
             <div className="mt-6 text-center">
