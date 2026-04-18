@@ -6,8 +6,13 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Medical Image Analysis Platform',
+  title: 'Health IQ — Clinical Image Analysis',
   description: 'AI-powered medical image analysis and collaboration platform',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({

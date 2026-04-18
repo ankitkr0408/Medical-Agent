@@ -52,9 +52,9 @@ export default function DashboardTab({ setActiveTab }: DashboardTabProps) {
     <div className="space-y-6">
       {/* Welcome Banner */}
       <div className="gradient-purple text-white rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-2">
+        {/* <h2 className="text-2xl font-bold mb-2">
           👋 Welcome back, {session?.user?.name}!
-        </h2>
+        </h2> */}
         <p className="text-lg opacity-90">
           <strong>{userRole.charAt(0).toUpperCase() + userRole.slice(1)}</strong>
           {specialization && ` - ${specialization}`} | 🔐 Secure AI-Powered Medical Analysis Platform
@@ -84,11 +84,11 @@ export default function DashboardTab({ setActiveTab }: DashboardTabProps) {
           <div className="text-xs text-gray-500 mt-2">All time</div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6 card-hover">
+        {/* <div className="bg-white border border-gray-200 rounded-lg p-6 card-hover">
           <div className="text-3xl font-bold text-indigo-600">94.2%</div>
           <div className="text-sm text-gray-600 mt-1">🤖 AI Accuracy</div>
           <div className="text-xs text-gray-500 mt-2">Industry leading</div>
-        </div>
+        </div> */}
       </div>
 
       {/* Quick Actions */}
