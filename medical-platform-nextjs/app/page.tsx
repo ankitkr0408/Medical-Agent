@@ -566,21 +566,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Trust strip ── */}
-      <div className="divider" />
-      <section style={{ padding: '44px 24px', background: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 28 }}>
-            Trusted by clinical teams at leading institutions
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 40 }}>
-            {['AIIMS Delhi', 'Apollo Hospitals', 'Fortis Healthcare', 'HealthBridge', 'Manipal Hospitals'].map(name => (
-              <span key={name} className="trust-logo">{name}</span>
-            ))}
-          </div>
-        </div>
-      </section>
-      <div className="divider" />
+      {/* ── Trust strip removed as requested ── */}
 
       {/* ── Features ── */}
       <section id="features" style={{ padding: '96px 24px', background: '#f8fafc' }}>
