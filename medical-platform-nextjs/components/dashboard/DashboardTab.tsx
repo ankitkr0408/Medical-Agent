@@ -84,11 +84,11 @@ export default function DashboardTab({ setActiveTab }: DashboardTabProps) {
           <div className="text-xs text-gray-500 mt-2">All time</div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6 card-hover">
+        {/* <div className="bg-white border border-gray-200 rounded-lg p-6 card-hover">
           <div className="text-3xl font-bold text-indigo-600">94.2%</div>
           <div className="text-sm text-gray-600 mt-1">🤖 AI Accuracy</div>
           <div className="text-xs text-gray-500 mt-2">Industry leading</div>
-        </div>
+        </div> */}
       </div>
 
       {/* Quick Actions */}
