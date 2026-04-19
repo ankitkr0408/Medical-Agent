@@ -1,115 +1,182 @@
-# 🏥 HealthIQ: AI-Driven Medical Diagnosis System
+# 🏥 HealthIQ — AI-Driven Medical Diagnosis System
 
-**HealthIQ** is a B.Tech final-year major project that applies **Artificial Intelligence and Large Language Models (LLMs)** to automate medical report analysis, simulate multiple doctor opinions, and provide human-readable health insights.  
-The system aims to improve healthcare accessibility, affordability, and early diagnosis support.
+> An intelligent platform that analyzes medical reports, simulates multi-specialist AI opinions, and delivers human-readable health insights.
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-health.synloop.in-blue?style=for-the-badge)](https://health.synloop.in)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org)
+[![MongoDB](https://img.shields.io/badge/MongoDB-6-green?style=for-the-badge&logo=mongodb)](https://mongodb.com)
 
 ---
 
 ## 🌐 Live Deployment
 
-[https://health.synloop.in](https://health.synloop.in)
+**[https://health.synloop.in](https://health.synloop.in)**
+
+---
+
+## 📸 Screenshots
+
+### Landing Page
+![Landing Page](medical-platform-nextjs/docs/screenshots/landing.png)
+
+### Login
+![Login](medical-platform-nextjs/docs/screenshots/login.png)
+
+### Register
+![Register](medical-platform-nextjs/docs/screenshots/register.png)
+
+### Dashboard
+![Dashboard](medical-platform-nextjs/docs/screenshots/dashboard.png)
+
+### Report Analysis
+![Report Analysis](medical-platform-nextjs/docs/screenshots/report-analysis.png)
+
+### Multi-Doctor Collaboration
+![Multi-Doctor Collaboration](medical-platform-nextjs/docs/screenshots/multidoctor-collaboration.png)
+
+### Q&A Chat
+![Q&A Chat](medical-platform-nextjs/docs/screenshots/Q&A.png)
+
+### History
+![History](medical-platform-nextjs/docs/screenshots/history.png)
+
+### Nearby Doctors
+![Nearby Doctors](medical-platform-nextjs/docs/screenshots/nearby-doctors.png)
 
 ---
 
 ## 📅 Project Timeline
-**Jan 2025 - April  2026**
+
+**April 2026** — B.Tech Final Year Major Project
 
 ---
 
 ## 🚀 Key Features
 
-- 📄 **Medical Report Analysis**  
-  Extracts clinical data from pathology reports using **OCR (Tesseract)**.
-
-- 🧠 **Multi-Agent AI Doctor Simulation**  
-  Multiple AI agents independently simulate doctor opinions across different medical domains.
-
-- 🧩 **Multidisciplinary Diagnosis**  
-  A coordinating agent combines insights from all AI doctors into a unified medical interpretation.
-
-- 📝 **Human-Readable Health Summaries**  
-  Uses **LLMs (MedGemma)** to summarize complex medical data into easy-to-understand language.
-
-- 🩺 **Specialist Recommendation System**  
-  Suggests relevant medical specializations (e.g., Cardiology, Nephrology, Pulmonology).
-
-- 💬 **RAG-Based Medical Chatbot**  
-  Allows users to ask natural-language questions about their reports using **Retrieval-Augmented Generation (RAG)**.
+| Feature | Description |
+|---|---|
+| 📄 Medical Report Analysis | Upload PDF/image reports — OCR extracts and structures clinical data |
+| 🧠 Multi-Agent AI Doctors | Multiple AI agents independently simulate specialist opinions |
+| 🧩 Multidisciplinary Diagnosis | A coordinating agent consolidates all AI insights into one report |
+| 📝 Plain-Language Summaries | LLMs translate complex medical data into easy-to-understand language |
+| � Speciailist Recommendations | Suggests relevant specializations (Cardiology, Nephrology, etc.) |
+| � PRAG Medical Chatbot | Ask natural-language questions about your report via RAG |
+| 🔐 Secure Auth | NextAuth v5 with session management |
+| ⚡ Real-time Updates | Socket.io powered live interactions |
 
 ---
 
-## 🏗️ System Architecture Overview
+## 🏗️ Architecture Overview
 
-1. Medical report uploaded (PDF / Image)
-2. OCR extracts text and medical values
-3. AI preprocessing agent structures data
-4. Multiple domain-specific AI agents analyze data independently
-5. Multidisciplinary agent consolidates insights
-6. LLM (MedGemma) generates final medical summary
-7. RAG-based chatbot enables interactive Q&A
+```
+User uploads report (PDF / Image)
+        ↓
+OCR + Image Processing (Sharp)
+        ↓
+AI Preprocessing Agent structures data
+        ↓
+Multiple domain-specific AI agents analyze independently
+        ↓
+Multidisciplinary agent consolidates insights
+        ↓
+LLM generates final human-readable summary
+        ↓
+RAG chatbot enables interactive Q&A on the report
+```
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Framework:** Next.js 14 (App Router)
-- **Language:** TypeScript
-- **Frontend:** React 18, Tailwind CSS, Framer Motion, Radix UI
-- **Backend:** Next.js API Routes, Socket.io
-- **Database:** MongoDB
-- **Auth:** NextAuth v5
-- **AI / LLM:** OpenAI API, LangChain
-- **Vector Store:** Pinecone (RAG)
-- **File Uploads:** UploadThing, AWS S3
-- **Caching:** Redis
-- **PDF Processing:** jsPDF, pdf-lib, Sharp (image processing)
-- **Validation:** Zod
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14 (App Router) |
+| Language | TypeScript 5 |
+| Frontend | React 18, Tailwind CSS, Framer Motion, Radix UI |
+| Backend | Next.js API Routes, Socket.io |
+| Database | MongoDB 6 |
+| Auth | NextAuth v5 |
+| AI / LLM | OpenAI API, LangChain |
+| Vector Store | Pinecone (RAG) |
+| File Uploads | UploadThing, AWS S3 |
+| Caching | Redis |
+| PDF Processing | jsPDF, pdf-lib, Sharp |
+| Validation | Zod |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- MongoDB instance
+- OpenAI API key
+- Pinecone account
+- Redis instance
+
+### Installation
+
+```bash
+# Clone the repo
+git clone https://github.com/sarvesh207590/HEALTH-IQ.git
+cd HEALTH-IQ/medical-platform-nextjs
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Fill in your keys in .env
+
+# Run development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 ---
 
 ## 🎯 Use Cases
 
-- Assists patients in understanding medical reports
-- Provides early AI-driven health insights
-- Reduces dependency on immediate doctor availability
-- Supports healthcare accessibility in rural areas
-- Acts as a pre-consultation medical analysis tool
+- Patients understanding complex medical reports without a doctor visit
+- Early AI-driven health insights before a consultation
+- Reducing dependency on immediate doctor availability
+- Supporting healthcare accessibility in rural/underserved areas
+- Pre-consultation medical analysis tool for clinics
+
+---
+
+## 📌 Roadmap
+
+- [ ] Wearable health data integration
+- [ ] Real-time lab API integration
+- [ ] Multilingual report support
+- [ ] Enhanced clinical validation pipeline
+- [ ] Mobile app (React Native)
 
 ---
 
 ## ⚠️ Disclaimer
 
-HealthIQ is an **AI-assisted decision-support system** and **does not replace professional medical consultation**.  
-Users are advised to consult qualified healthcare professionals for diagnosis and treatment.
+HealthIQ is an **AI-assisted decision-support system** and **does not replace professional medical advice**.
+Always consult a qualified healthcare professional for diagnosis and treatment decisions.
 
 ---
 
 ## 👥 Team
 
-- **Ankit Kumar**  
-- **Sarthak Gupta**  
-- **Aditya Birwatkar**  
-- **Sarvesh Mokal**
+- Ankit Kumar
+- Sarthak Gupta
+- Aditya Birwatkar
+- Sarvesh Mokal
 
-**Mentor:** Prof. Bhagyashree Patil  
+**Mentor:** Prof. Bhagyashree Patil
 **Institution:** Pillai College of Engineering, New Panvel
-
----
-
-## 📌 Future Enhancements
-
-- Integration with wearable health data
-- Real-time lab API integration
-- Multilingual support
-- Enhanced clinical validation
-- Deployment on cloud infrastructure
 
 ---
 
 ## ⭐ Acknowledgements
 
-Special thanks to faculty mentors and open-source communities for supporting AI-driven healthcare innovation.
-
----
-
-
+Special thanks to faculty mentors and the open-source communities behind Next.js, LangChain, OpenAI, and Pinecone for making this project possible.
