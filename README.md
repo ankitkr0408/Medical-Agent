@@ -131,8 +131,8 @@ RAG chatbot enables interactive Q&A on the report
 
 ```bash
 # Clone the repo
-git clone https://github.com/sarvesh207590/HEALTH-IQ.git
-cd HEALTH-IQ/medical-platform-nextjs
+git clone https://github.com/ankitkr0408/Medical-Agent
+cd Medical-Agent/medical-platform-nextjs
 
 # Install dependencies
 npm install
