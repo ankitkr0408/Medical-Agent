@@ -12,7 +12,7 @@ The system aims to improve healthcare accessibility, affordability, and early di
 ---
 
 ## 📅 Project Timeline
-**April  2026**
+**Jan 2025 - April  2026**
 
 ---
 
@@ -52,13 +52,18 @@ The system aims to improve healthcare accessibility, affordability, and early di
 
 ## 🛠️ Tech Stack
 
-- **Programming Language:** Python  
-- **Frontend:** Streamlit  
-- **Backend:** Flask  
-- **Database:** MongoDB  
-- **OCR:** Tesseract  
-- **LLMs:** OpenAI, MedGemma  
-- **Frameworks & Tools:** LangChain, Retrieval-Augmented Generation (RAG)
+- **Framework:** Next.js 14 (App Router)
+- **Language:** TypeScript
+- **Frontend:** React 18, Tailwind CSS, Framer Motion, Radix UI
+- **Backend:** Next.js API Routes, Socket.io
+- **Database:** MongoDB
+- **Auth:** NextAuth v5
+- **AI / LLM:** OpenAI API, LangChain
+- **Vector Store:** Pinecone (RAG)
+- **File Uploads:** UploadThing, AWS S3
+- **Caching:** Redis
+- **PDF Processing:** jsPDF, pdf-lib, Sharp (image processing)
+- **Validation:** Zod
 
 ---
 
