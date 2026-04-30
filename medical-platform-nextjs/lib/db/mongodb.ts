@@ -18,10 +18,17 @@ if (process.env.NODE_ENV === 'production') {
     client = globalForMongo.mongoClient
 }
 
+let indexesReady = false
+
 export async function getDb(): Promise<Db> {
     await client.connect()
-    // DB name is embedded in the URI ("healthiq") - MongoClient picks it up automatically
-    return client.db()
+    const db = client.db()
+    // Lazily ensure indexes on first real DB call (import avoids circular dep)
+    if (!indexesReady) {
+        indexesReady = true
+        import('./indexes').then(m => m.ensureIndexes()).catch(() => {})
+    }
+    return db
 }
 
 export async function testConnection(): Promise<boolean> {

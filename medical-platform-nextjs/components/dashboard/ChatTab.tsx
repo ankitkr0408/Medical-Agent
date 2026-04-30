@@ -182,21 +182,79 @@ export default function ChatTab() {
         if (!currentRoom) return;
         setConsultLoading(true);
         setProgress(0);
-        setStatusMsg(action === 'auto' ? '🔬 Analyzing imaging details...' : '⏳ Processing...');
+        setStatusMsg('⏳ Processing...');
 
-        const endpoint = action === 'auto' ? '/api/consultation/auto' : '/api/consultation';
-        await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caseId: currentRoom.id, action }),
-        });
+        if (action !== 'auto') {
+            // Non-auto actions stay non-streaming (short single responses)
+            const endpoint = '/api/consultation';
+            await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ caseId: currentRoom.id, action }),
+            });
+            await loadMessages();
+            await reloadRoom();
+            setConsultLoading(false);
+            setStatusMsg('');
+            return;
+        }
 
-        setStatusMsg(action === 'auto' ? '✅ Complete consultation finished!' : '');
-        setProgress(action === 'auto' ? 100 : 0);
-        await loadMessages();
-        await reloadRoom();
-        setConsultLoading(false);
-        setTimeout(() => { setStatusMsg(''); setProgress(0); }, 2000);
+        // Auto consultation — consume SSE stream to show live progress
+        try {
+            const res = await fetch('/api/consultation/auto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ caseId: currentRoom.id }),
+            });
+
+            if (!res.ok || !res.body) throw new Error('Stream failed');
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            const specialistOrder = ['Radiologist', 'Cardiologist', 'Pulmonologist'];
+            let specialistIdx = 0;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() ?? '';
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    try {
+                        const event = JSON.parse(line.slice(6));
+                        if (event.type === 'specialist_start') {
+                            const pct = Math.round(((specialistIdx + 1) / (specialistOrder.length + 1)) * 80);
+                            setProgress(pct);
+                            setStatusMsg(`🔬 ${event.specialist.split('(')[1]?.replace(')', '') ?? event.specialist} reviewing...`);
+                        } else if (event.type === 'specialist_done') {
+                            specialistIdx++;
+                            // Reload messages so each specialist card appears immediately
+                            await loadMessages();
+                        } else if (event.type === 'summary_start') {
+                            setProgress(85);
+                            setStatusMsg('📋 Chief Medical Officer synthesizing findings...');
+                        } else if (event.type === 'done') {
+                            setProgress(100);
+                            setStatusMsg('✅ Multidisciplinary consultation complete!');
+                            await loadMessages();
+                            await reloadRoom();
+                        } else if (event.type === 'error') {
+                            setStatusMsg(`❌ ${event.message}`);
+                        }
+                    } catch { /* ignore */ }
+                }
+            }
+        } catch (err) {
+            console.error('Consultation stream error:', err);
+            setStatusMsg('❌ Consultation failed. Please try again.');
+        } finally {
+            setConsultLoading(false);
+            setTimeout(() => { setStatusMsg(''); setProgress(0); }, 3000);
+        }
     };
 
     const stage = currentRoom?.consultation_stage || 'initial';

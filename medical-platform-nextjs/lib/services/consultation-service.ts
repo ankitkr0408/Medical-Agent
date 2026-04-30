@@ -1,10 +1,10 @@
 // Consultation Service - aligned with Python chat_system.py consultation workflow
 // Stage and specialist_opinions stored on the chat room doc (same as Python)
-import { v4 as uuidv4 } from 'uuid'
 import { chatsCol } from '@/lib/db/collections'
-import { getSpecialistResponse, getMultidisciplinarySummary, addMessage } from './chat-service'
+import { getSpecialistResponse, getSpecialistResponseStream, getMultidisciplinarySummary, addMessage } from './chat-service'
 import type { SpecialistType } from '@/lib/ai/prompts'
 
+// Reordered so Radiologist goes first. Essential to establish ground truth from imagery!
 const SPECIALISTS: Array<{ type: SpecialistType; name: string }> = [
   { type: 'radiologist', name: 'Dr. Michael Rodriguez (Radiologist)' },
   { type: 'cardiologist', name: 'Dr. Sarah Chen (Cardiologist)' },
@@ -27,14 +27,19 @@ export async function startConsultation(
     { $set: { consultation_stage: 'specialists' } }
   )
 
-  // Get first specialist opinion (Radiologist)
+  // Get first specialist opinion (Radiologist MUST go first)
   const specialist = SPECIALISTS[0]
-  const response = await getSpecialistResponse(specialist.type, room.description, findings)
+  const response = await getSpecialistResponse(specialist.type, room.description, findings, []) // empty opinions list
 
-  await addMessage(caseId, specialist.name, response, userId, 'ai_response')
+  let specialistNameForMessage = specialist.name;
+  if(specialist.name.includes("(")) {
+      specialistNameForMessage = specialist.name.split('(')[1]?.replace(')', '') + " Opinion";
+  }
+
+  await addMessage(caseId, specialist.name, `**${specialistNameForMessage}:**\n\n${response}`, userId, 'ai_response')
   await col.updateOne(
     { _id: caseId as any, user_id: userId },
-    { $push: { specialist_opinions: response } }
+    { $push: { specialist_opinions: `${specialist.name}: ${response}` } }
   )
 
   return { specialist: specialist.name, response, stage: 'specialists' }
@@ -58,12 +63,18 @@ export async function getNextSpecialistOpinion(
   }
 
   const specialist = SPECIALISTS[nextIndex]
-  const response = await getSpecialistResponse(specialist.type, room.description, findings)
+  // Pass Previous opinions! Anti-hallucination context flow.
+  const response = await getSpecialistResponse(specialist.type, room.description, findings, opinions)
 
-  await addMessage(caseId, specialist.name, response, userId, 'ai_response')
+  let specialistNameForMessage = specialist.name;
+  if(specialist.name.includes("(")) {
+      specialistNameForMessage = specialist.name.split('(')[1]?.replace(')', '') + " Opinion";
+  }
+
+  await addMessage(caseId, specialist.name, `**${specialistNameForMessage}:**\n\n${response}`, userId, 'ai_response')
   await col.updateOne(
     { _id: caseId as any, user_id: userId },
-    { $push: { specialist_opinions: response } }
+    { $push: { specialist_opinions: `${specialist.name}: ${response}` } }
   )
 
   return { specialist: specialist.name, response, stage: 'specialists', opinionsCount: nextIndex + 1 }
@@ -120,15 +131,22 @@ export async function autoCompleteConsultation(
   const opinions: string[] = []
 
   for (const specialist of SPECIALISTS) {
-    const response = await getSpecialistResponse(specialist.type, room.description, findings)
+    // SEQUENTIAL FLOW: A specialist MUST reading the preceding specialists' opinions!
+    const response = await getSpecialistResponse(specialist.type, room.description, findings, opinions)
+    
+    let specialistNameForMessage = specialist.name;
+    if(specialist.name.includes("(")) {
+        specialistNameForMessage = specialist.name.split('(')[1]?.replace(')', '') + " Opinion";
+    }
+
     await addMessage(
       caseId,
       specialist.name,
-      `**${specialist.name.split('(')[1]?.replace(')', '') ?? specialist.name} Opinion:**\n\n${response}`,
+      `**${specialistNameForMessage}:**\n\n${response}`,
       userId,
       'ai_response'
     )
-    opinions.push(response)
+    opinions.push(`${specialist.name}: ${response}`)
   }
 
   await col.updateOne(
@@ -162,6 +180,63 @@ export async function autoCompleteConsultation(
   return { opinions, summary }
 }
 
+// Streaming version — yields SSE-ready events so each specialist appears live
+export async function* autoCompleteConsultationStream(
+  caseId: string,
+  userId: string,
+  findings?: string[]
+): AsyncGenerator<object> {
+  const col = await chatsCol()
+  const room = await col.findOne({ _id: caseId as any, user_id: userId })
+  if (!room) throw new Error('Chat room not found')
+
+  yield { type: 'system', text: '🏥 **Starting Multidisciplinary Consultation**\n\nOur specialist team is now reviewing your case...' }
+
+  const opinions: string[] = []
+
+  for (const specialist of SPECIALISTS) {
+    yield { type: 'specialist_start', specialist: specialist.name }
+
+    let fullResponse = ''
+    for await (const token of getSpecialistResponseStream(specialist.type, room.description, findings, opinions)) {
+      fullResponse += token
+      yield { type: 'token', specialist: specialist.name, text: token }
+    }
+
+    opinions.push(`${specialist.name}: ${fullResponse}`)
+
+    const label = specialist.name.includes('(')
+      ? specialist.name.split('(')[1]?.replace(')', '') + ' Opinion'
+      : specialist.name
+
+    await addMessage(caseId, specialist.name, `**${label}:**\n\n${fullResponse}`, userId, 'ai_response')
+    yield { type: 'specialist_done', specialist: specialist.name, response: fullResponse }
+  }
+
+  await col.updateOne(
+    { _id: caseId as any, user_id: userId },
+    { $set: { consultation_stage: 'specialists', specialist_opinions: opinions } }
+  )
+
+  yield { type: 'summary_start' }
+  const summary = await getMultidisciplinarySummary(room.description, opinions, findings)
+
+  await addMessage(
+    caseId,
+    'Dr. Lisa Thompson (Chief Medical Officer)',
+    `**🏥 MULTIDISCIPLINARY SUMMARY**\n\n${summary}`,
+    userId,
+    'ai_response'
+  )
+
+  await col.updateOne(
+    { _id: caseId as any, user_id: userId },
+    { $set: { consultation_stage: 'summary' } }
+  )
+
+  yield { type: 'done', summary }
+}
+
 // API route handler - processes consultation based on current stage
 export class ConsultationWorkflow {
   async processConsultation(caseId: string, userMessage: string, userId: string) {
@@ -173,12 +248,12 @@ export class ConsultationWorkflow {
     const opinions = room.specialist_opinions || []
 
     if (stage === 'initial') {
-      return startConsultation(caseId, userId)
+      return startConsultation(caseId, userId, [])
     } else if (stage === 'specialists') {
       if (opinions.length >= SPECIALISTS.length) {
-        return generateSummary(caseId, userId)
+        return generateSummary(caseId, userId, [])
       }
-      return getNextSpecialistOpinion(caseId, userId)
+      return getNextSpecialistOpinion(caseId, userId, [])
     }
     return { message: 'Consultation is complete. You can ask follow-up questions.', stage }
   }

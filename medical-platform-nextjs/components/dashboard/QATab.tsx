@@ -34,6 +34,7 @@ export default function QATab() {
   const [rooms, setRooms] = useState<QARoom[]>([]);
   const [currentRoom, setCurrentRoom] = useState<QARoom | null>(null);
   const [messages, setMessages] = useState<QAMessage[]>([]);
+  const [streamingAnswer, setStreamingAnswer] = useState('');
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [roomName, setRoomName] = useState('');
@@ -96,16 +97,52 @@ export default function QATab() {
     const q = input.trim();
     setInput('');
     setSending(true);
-    setIsUserScrolling(false); // Allow auto-scroll for new messages
+    setStreamingAnswer('');
+    setIsUserScrolling(false);
+
+    // Optimistically add user message
     setMessages(prev => [...prev, { id: `tmp-${Date.now()}`, user: session?.user?.name || 'User', content: q, timestamp: new Date().toISOString() }]);
+
     try {
-      await fetch(`/api/qa/${currentRoom.id}/messages`, {
+      const res = await fetch(`/api/qa/${currentRoom.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: q }),
       });
-      await loadMessages(currentRoom);
-    } finally { setSending(false); }
+
+      if (!res.ok || !res.body) throw new Error('Request failed');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'token') {
+              setStreamingAnswer(prev => prev + event.text);
+              bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+            } else if (event.type === 'done') {
+              // Reload from DB to get persisted messages
+              setStreamingAnswer('');
+              await loadMessages(currentRoom);
+            }
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (err) {
+      console.error('QA send error:', err);
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleScroll = () => {
@@ -216,11 +253,25 @@ export default function QATab() {
                   </div>
                 );
               })}
-              {sending && (
+              {/* Live streaming answer bubble */}
+              {sending && streamingAnswer && (
+                <div className="flex gap-3 items-start">
+                  <span className="text-2xl flex-shrink-0">🤖</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-600 mb-1">Report QA System</p>
+                    <div
+                      className="text-sm rounded-2xl px-4 py-2 break-words bg-green-50 border border-green-200 text-gray-800"
+                      dangerouslySetInnerHTML={{ __html: formatMarkdown(streamingAnswer) }}
+                    />
+                    <span className="inline-block w-2 h-3 bg-green-500 animate-pulse ml-1 align-middle rounded-sm" />
+                  </div>
+                </div>
+              )}
+              {sending && !streamingAnswer && (
                 <div className="flex gap-3 items-start">
                   <span className="text-2xl">🤖</span>
                   <div className="bg-green-50 border border-green-200 rounded-2xl px-4 py-2">
-                    <span className="text-sm text-gray-500 animate-pulse">Report QA System is thinking...</span>
+                    <span className="text-sm text-gray-500 animate-pulse">Searching your reports...</span>
                   </div>
                 </div>
               )}

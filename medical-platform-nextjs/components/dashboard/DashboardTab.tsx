@@ -16,10 +16,39 @@ export default function DashboardTab({ setActiveTab }: DashboardTabProps) {
   });
   const [recentAnalyses, setRecentAnalyses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pinecone, setPinecone] = useState<any>(null);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchPineconeStatus();
   }, []);
+
+  const fetchPineconeStatus = async () => {
+    try {
+      const res = await fetch('/api/pinecone/status');
+      const d = await res.json();
+      setPinecone(d);
+    } catch {
+      setPinecone({ enabled: false, error: 'Could not reach status endpoint' });
+    }
+  };
+
+  const handleBackfill = async () => {
+    setBackfilling(true);
+    setBackfillResult(null);
+    try {
+      const res = await fetch('/api/pinecone/backfill', { method: 'POST' });
+      const d = await res.json();
+      setBackfillResult(d.message ?? (d.error || 'Unknown result'));
+      await fetchPineconeStatus();
+    } catch {
+      setBackfillResult('Backfill request failed.');
+    } finally {
+      setBackfilling(false);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -161,6 +190,50 @@ export default function DashboardTab({ setActiveTab }: DashboardTabProps) {
               No recent analyses found. Upload your first medical image to get started!
             </p>
           </div>
+        )}
+      </div>
+
+      {/* Pinecone RAG Status Card */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+            🔍 Vector RAG Status
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+              pinecone?.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {pinecone === null ? 'Checking…' : pinecone.enabled ? 'Pinecone Active' : 'In-Memory Fallback'}
+            </span>
+          </h3>
+          {pinecone?.enabled && (
+            <span className="text-xs text-gray-400">{pinecone.totalVectors ?? 0} vectors indexed</span>
+          )}
+        </div>
+
+        {pinecone?.enabled ? (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500">
+              Index: <span className="font-mono text-purple-700">{pinecone.index}</span>
+              {' · '}Dimension: {pinecone.dimension}
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBackfill}
+                disabled={backfilling}
+                className="px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+              >
+                {backfilling ? 'Syncing…' : '⚡ Sync existing reports → Pinecone'}
+              </button>
+              {backfillResult && (
+                <span className="text-xs text-green-700 font-medium">{backfillResult}</span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">
+            {pinecone?.error
+              ? `Error: ${pinecone.error}`
+              : 'Add PINECONE_API_KEY to .env to enable fast semantic search.'}
+          </p>
         )}
       </div>
 

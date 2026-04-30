@@ -8,15 +8,40 @@ export interface AnalysisResult {
   severity?: 'NORMAL' | 'MILD' | 'MODERATE' | 'SEVERE' | 'CRITICAL'
 }
 
-// Translate from Python analyze_image()
-export async function analyzeImage(imageBuffer: Buffer): Promise<AnalysisResult> {
-  try {
-    // Convert buffer to base64
-    const base64Image = imageBuffer.toString('base64')
-    const dataUrl = `data:image/png;base64,${base64Image}`
+// Streaming variant — yields text chunks as they arrive
+export async function analyzeImageStream(imageBuffer: Buffer): Promise<AsyncIterable<string>> {
+  const base64Image = imageBuffer.toString('base64')
+  const dataUrl = `data:image/png;base64,${base64Image}`
 
-    // Call GPT-4 Vision (same as Python version)
-    const FULL_ANALYSIS_PROMPT = `You are an expert medical imaging AI assistant analyzing a patient's medical image. Provide a comprehensive, detailed analysis following this structure:
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    stream: true,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are an expert medical imaging AI providing detailed analysis of medical images for licensed healthcare professionals. Analyze the actual image provided with precise medical terminology.',
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: FULL_ANALYSIS_PROMPT },
+          { type: 'image_url', image_url: { url: dataUrl } },
+        ],
+      },
+    ],
+    max_tokens: 2000,
+  })
+
+  return (async function* () {
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content
+      if (text) yield text
+    }
+  })()
+}
+
+const FULL_ANALYSIS_PROMPT = `You are an expert medical imaging AI assistant analyzing a patient's medical image. Provide a comprehensive, detailed analysis following this structure:
 
 ### 1. Image Type & Region
 - Identify the imaging modality (X-ray, MRI, CT, Ultrasound, etc.)
@@ -46,13 +71,16 @@ Explain the findings in simple, clear language:
 - Lifestyle modifications if applicable
 - When to seek medical attention
 
-**IMPORTANT:** 
-- Analyze the ACTUAL image provided - describe what you specifically see
-- Do NOT provide generic responses or refuse analysis
-- This is a clinical decision support tool for licensed medical professionals
-- Be specific about visible structures, abnormalities, and measurements
+**IMPORTANT:** Analyze the ACTUAL image provided — describe what you specifically see. This is a clinical decision support tool for licensed medical professionals.
 
 Format using markdown with clear headers and bullet points.`
+
+// Translate from Python analyze_image()
+export async function analyzeImage(imageBuffer: Buffer): Promise<AnalysisResult> {
+  try {
+    // Convert buffer to base64
+    const base64Image = imageBuffer.toString('base64')
+    const dataUrl = `data:image/png;base64,${base64Image}`
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -60,11 +88,7 @@ Format using markdown with clear headers and bullet points.`
         {
           role: 'system',
           content:
-            'You are an expert medical imaging AI providing detailed analysis of medical images. ' +
-            'You MUST analyze the actual image provided and describe specific visible structures, abnormalities, and findings. ' +
-            'This is a clinical decision support system for licensed healthcare professionals. ' +
-            'Never refuse to analyze an image or provide generic responses. ' +
-            'Always describe what you specifically observe in the image with precise medical terminology.',
+            'You are an expert medical imaging AI providing detailed analysis of medical images for licensed healthcare professionals. Analyze the actual image provided with precise medical terminology.',
         },
         {
           role: 'user',
@@ -93,6 +117,14 @@ Format using markdown with clear headers and bullet points.`
     console.error('Error analyzing image:', error)
     throw new Error('Failed to analyze image')
   }
+}
+
+// Exported for use in streaming route
+export function extractFindingsAndKeywordsPublic(analysisText: string) {
+  return extractFindingsAndKeywords(analysisText)
+}
+export function detectSeverityPublic(text: string) {
+  return detectSeverity(text)
 }
 
 // Translate from Python extract_findings_and_keywords()

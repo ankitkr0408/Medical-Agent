@@ -4,8 +4,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import sharp from 'sharp'
 import { auth } from '@/lib/auth'
-import { analyzeImage } from '@/lib/ai/image-analysis'
+import { analyzeImageStream, extractFindingsAndKeywordsPublic, detectSeverityPublic } from '@/lib/ai/image-analysis'
 import { qaAnalysesCol } from '@/lib/db/collections'
+import { checkRateLimit, rateLimitHeaders } from '@/lib/middleware/rate-limit'
+import { auditLog } from '@/lib/db/audit'
+import { upsertAnalysisVector } from '@/lib/services/pinecone-rag'
+import { extractStructuredAnalysis } from '@/lib/ai/structured-analysis'
 
 // Proper JET colormap matching Python cv2.COLORMAP_JET
 // JET: blue(0) -> cyan(64) -> green(128) -> yellow(192) -> red(255)
@@ -74,71 +78,144 @@ async function generateHeatmap(imageBuffer: Buffer) {
   return { overlay, heatmap }
 }
 
+// SSE helper
+function sseEvent(data: object) {
+  return `data: ${JSON.stringify(data)}\n\n`
+}
+
 export async function POST(request: NextRequest) {
-  try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { imageData, filename, enableXAI } = body
-
-    if (!imageData) {
-      return NextResponse.json({ error: 'No image data provided' }, { status: 400 })
-    }
-
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
-    }
-
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
-    const imageBuffer = Buffer.from(base64Data, 'base64')
-
-    const analysisResult = await analyzeImage(imageBuffer)
-
-    // Generate heatmap if XAI enabled
-    let overlayDataUrl: string | null = null
-    let heatmapDataUrl: string | null = null
-    if (enableXAI !== false) {
-      try {
-        const { overlay, heatmap } = await generateHeatmap(imageBuffer)
-        overlayDataUrl = `data:image/png;base64,${overlay.toString('base64')}`
-        heatmapDataUrl = `data:image/png;base64,${heatmap.toString('base64')}`
-      } catch (e) {
-        console.warn('Heatmap generation failed:', e)
-      }
-    }
-
-    const col = await qaAnalysesCol()
-    const docId = uuidv4()
-    const dateStr = new Date().toISOString().replace('T', ' ').slice(0, 19)
-
-    await col.insertOne({
-      id: docId,
-      user_id: session.user.id,
-      filename: filename || 'unknown.jpg',
-      analysis: analysisResult.analysis,
-      findings: analysisResult.findings,
-      keywords: analysisResult.keywords,
-      date: dateStr,
-      type: 'image',
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        id: docId,
-        analysis: analysisResult.analysis,
-        findings: analysisResult.findings,
-        keywords: analysisResult.keywords,
-        date: dateStr,
-        overlay: overlayDataUrl,
-        heatmap: heatmapDataUrl,
-      },
-    })
-  } catch (error) {
-    console.error('Analysis error:', error)
-    return NextResponse.json({ error: 'Failed to analyze image' }, { status: 500 })
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const rl = checkRateLimit(session.user.id, 'analyze')
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Rate limit exceeded. Try again in ${Math.ceil(rl.resetInMs / 1000)}s.` },
+      { status: 429, headers: rateLimitHeaders(rl, 10) }
+    )
+  }
+
+  const body = await request.json()
+  const { imageData, filename, enableXAI } = body
+
+  if (!imageData) {
+    return NextResponse.json({ error: 'No image data provided' }, { status: 400 })
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+  }
+
+  const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
+  const imageBuffer = Buffer.from(base64Data, 'base64')
+
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        // Generate heatmap in parallel while we prepare the AI stream
+        let overlayDataUrl: string | null = null
+        let heatmapDataUrl: string | null = null
+        if (enableXAI !== false) {
+          try {
+            const { overlay, heatmap } = await generateHeatmap(imageBuffer)
+            overlayDataUrl = `data:image/png;base64,${overlay.toString('base64')}`
+            heatmapDataUrl = `data:image/png;base64,${heatmap.toString('base64')}`
+          } catch {
+            // heatmap is optional, continue without it
+          }
+        }
+
+        // Send heatmap immediately so UI can display it while analysis streams
+        controller.enqueue(encoder.encode(sseEvent({
+          type: 'meta',
+          overlay: overlayDataUrl,
+          heatmap: heatmapDataUrl,
+        })))
+
+        // Stream the AI analysis token by token
+        const tokenStream = await analyzeImageStream(imageBuffer)
+        let fullText = ''
+        for await (const token of tokenStream) {
+          fullText += token
+          controller.enqueue(encoder.encode(sseEvent({ type: 'token', text: token })))
+        }
+
+        // Post-process: regex extraction + structured LLM pass in parallel
+        const [{ findings, keywords }, structured] = await Promise.all([
+          Promise.resolve(extractFindingsAndKeywordsPublic(fullText)),
+          extractStructuredAnalysis(fullText),
+        ])
+        const severity = structured?.overall_severity ?? detectSeverityPublic(fullText)
+        const col = await qaAnalysesCol()
+        const docId = uuidv4()
+        const dateStr = new Date().toISOString().replace('T', ' ').slice(0, 19)
+
+        await col.insertOne({
+          id: docId,
+          user_id: session.user.id,
+          filename: filename || 'unknown.jpg',
+          analysis: fullText,
+          findings,
+          keywords,
+          date: dateStr,
+          type: 'image',
+          structured: structured ?? undefined,
+        } as any)
+
+        // Upsert into Pinecone for fast semantic search (no-op when key not set)
+        upsertAnalysisVector(docId, session.user.id, fullText, {
+          filename: filename || 'unknown.jpg',
+          date: dateStr,
+          keywords,
+        }).catch(() => {})   // fire-and-forget, never block the response
+
+        await auditLog({
+          user_id: session.user.id,
+          action: 'image_analysis',
+          route: '/api/analyze',
+          model: 'gpt-4o',
+          input_summary: filename || 'unknown.jpg',
+          severity: severity ?? 'UNKNOWN',
+          success: true,
+          timestamp: new Date().toISOString(),
+        })
+
+        controller.enqueue(encoder.encode(sseEvent({
+          type: 'done',
+          id: docId,
+          findings,
+          keywords,
+          severity,
+          date: dateStr,
+          structured,   // null when extraction fails — UI handles gracefully
+        })))
+      } catch (error) {
+        console.error('Analysis stream error:', error)
+        await auditLog({
+          user_id: session.user.id,
+          action: 'image_analysis',
+          route: '/api/analyze',
+          model: 'gpt-4o',
+          input_summary: filename || 'unknown.jpg',
+          success: false,
+          error: String(error),
+          timestamp: new Date().toISOString(),
+        })
+        controller.enqueue(encoder.encode(sseEvent({ type: 'error', message: 'Analysis failed' })))
+      } finally {
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  })
 }

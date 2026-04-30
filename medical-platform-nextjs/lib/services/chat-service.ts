@@ -123,27 +123,54 @@ export async function getChatRoom(caseId: string, userId: string) {
     return room ? serializeDoc(room as any) : null
 }
 
-// AI specialist response (same logic as Python)
+// AI specialist response (Now supports receiving prior opinions for sequential context)
 export async function getSpecialistResponse(
     specialistType: SpecialistType,
     caseDescription: string,
-    findings?: string[]
+    findings?: string[],
+    previousOpinions?: string[] // <-- Added for context flow
 ): Promise<string> {
     try {
-        const prompt = getSpecialistPrompt(specialistType, caseDescription, findings)
+        const prompt = getSpecialistPrompt(specialistType, caseDescription, findings, previousOpinions)
+        
+        // Changed to gpt-4o from gpt-3.5-turbo as 3.5 hallucinated too much.
         const response = await openai.chat.completions.create({
-            model: 'gpt-3.5-turbo',
+            model: 'gpt-4o', // Upgraded for better reasoning
             messages: [
                 { role: 'system', content: prompt },
                 { role: 'user', content: 'Please provide your initial assessment of this case' },
             ],
-            max_tokens: 200,
-            temperature: 0.3,
+            max_tokens: 250,
+            temperature: 0.1, // Lower temperature to avoid hallucination
         })
         return response.choices[0].message.content || 'No response generated'
     } catch (error) {
         console.error('Error getting specialist response:', error)
         return 'I encountered an error while analyzing this case.'
+    }
+}
+
+// Streaming variant — yields text chunks for live display
+export async function* getSpecialistResponseStream(
+    specialistType: SpecialistType,
+    caseDescription: string,
+    findings?: string[],
+    previousOpinions?: string[]
+): AsyncGenerator<string> {
+    const prompt = getSpecialistPrompt(specialistType, caseDescription, findings, previousOpinions)
+    const stream = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        stream: true,
+        messages: [
+            { role: 'system', content: prompt },
+            { role: 'user', content: 'Please provide your initial assessment of this case' },
+        ],
+        max_tokens: 250,
+        temperature: 0.1,
+    })
+    for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content
+        if (text) yield text
     }
 }
 
@@ -155,13 +182,13 @@ export async function getMultidisciplinarySummary(
     try {
         const prompt = getSummaryPrompt(caseDescription, specialistOpinions, findings)
         const response = await openai.chat.completions.create({
-            model: 'gpt-3.5-turbo',
+            model: 'gpt-4o', // Upgraded model
             messages: [
                 { role: 'system', content: prompt },
                 { role: 'user', content: 'Please provide the multidisciplinary summary.' },
             ],
-            max_tokens: 400,
-            temperature: 0.2,
+            max_tokens: 500,
+            temperature: 0.1, // Lower temperature for factual summary
         })
         return response.choices[0].message.content || 'No summary generated'
     } catch (error) {

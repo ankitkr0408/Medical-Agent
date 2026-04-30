@@ -60,7 +60,7 @@ function parseMarkdownLine(line: string): { text: string; isBold: boolean; isHea
 }
 
 export async function generateReport(
-  data: AnalysisData,
+  data: AnalysisData & { structured?: any },
   includeReferences: boolean = true
 ): Promise<Blob> {
   const doc = new jsPDF();
@@ -123,123 +123,155 @@ export async function generateReport(
     }
   };
 
-  // Title
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Medical Analysis Report', pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 15;
+  // ── Header ────────────────────────────────────────────────────────────────
+  doc.setFillColor(88, 28, 135)   // purple-900
+  doc.rect(0, 0, pageWidth, 28, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  doc.text('HealthIQ — AI Medical Imaging Report', pageWidth / 2, 12, { align: 'center' })
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.text('CLINICAL DECISION SUPPORT  |  FOR LICENSED HEALTHCARE PROFESSIONALS ONLY', pageWidth / 2, 21, { align: 'center' })
+  doc.setTextColor(0, 0, 0)
+  yPosition = 36
 
-  // Add a line separator
-  doc.setDrawColor(100, 100, 100);
-  doc.setLineWidth(0.5);
-  doc.line(margin, yPosition, pageWidth - margin, yPosition);
-  yPosition += 10;
-
-  // Metadata section
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`Date: `, margin, yPosition);
-  doc.setFont('helvetica', 'normal');
-  doc.text(new Date().toLocaleString(), margin + 15, yPosition);
-  yPosition += 6;
-
-  doc.setFont('helvetica', 'bold');
-  doc.text(`Report ID: `, margin, yPosition);
-  doc.setFont('helvetica', 'normal');
-  doc.text(data.id || 'N/A', margin + 25, yPosition);
-  yPosition += 6;
-
+  // ── Report metadata ────────────────────────────────────────────────────────
+  doc.setFillColor(248, 245, 255)
+  doc.roundedRect(margin, yPosition, maxWidth, 22, 2, 2, 'F')
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Report ID:', margin + 3, yPosition + 7)
+  doc.setFont('helvetica', 'normal')
+  doc.text(data.id || 'N/A', margin + 24, yPosition + 7)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Generated:', margin + 3, yPosition + 15)
+  doc.setFont('helvetica', 'normal')
+  doc.text(new Date().toLocaleString(), margin + 26, yPosition + 15)
   if (data.filename) {
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Source File: `, margin, yPosition);
-    doc.setFont('helvetica', 'normal');
-    doc.text(data.filename, margin + 28, yPosition);
-    yPosition += 6;
+    doc.setFont('helvetica', 'bold')
+    doc.text('Source:', pageWidth / 2 + 3, yPosition + 7)
+    doc.setFont('helvetica', 'normal')
+    doc.text(data.filename, pageWidth / 2 + 20, yPosition + 7)
+  }
+  const structured = (data as any).structured
+  if (structured?.overall_severity) {
+    doc.setFont('helvetica', 'bold')
+    doc.text('Severity:', pageWidth / 2 + 3, yPosition + 15)
+    doc.setFont('helvetica', 'normal')
+    doc.text(structured.overall_severity + (structured.urgent ? '  ⚠ URGENT' : ''), pageWidth / 2 + 22, yPosition + 15)
+  }
+  yPosition += 28
+
+  // ── Section helper ─────────────────────────────────────────────────────────
+  const soapSection = (title: string, letter: string) => {
+    checkNewPage(18)
+    doc.setFillColor(237, 233, 254)   // purple-100
+    doc.rect(margin, yPosition, maxWidth, 10, 'F')
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(88, 28, 135)
+    doc.text(`${letter}  ${title}`, margin + 3, yPosition + 7)
+    doc.setTextColor(0, 0, 0)
+    yPosition += 14
   }
 
-  yPosition += 10;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // S — SUBJECTIVE  (patient-facing info: file info, date presented)
+  // ═══════════════════════════════════════════════════════════════════════════
+  soapSection('SUBJECTIVE — Clinical Context', 'S')
+  addFormattedText(`Imaging file: ${data.filename || 'unknown'}`, 10, false, 3, 1.2)
+  if (structured?.modality) addFormattedText(`Imaging modality: ${structured.modality}`, 10, false, 3, 1.2)
+  addFormattedText(`Date of analysis: ${data.createdAt ? new Date(data.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}`, 10, false, 3, 1.2)
+  yPosition += 6
 
-  // Analysis section
-  if (data.analysis) {
-    checkNewPage(20);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Detailed Analysis', margin, yPosition);
-    yPosition += 8;
-
-    addMarkdownText(data.analysis, 10);
-    yPosition += 8;
-  }
-
-  // Findings section
-  if (data.findings && data.findings.length > 0) {
-    checkNewPage(20);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Key Findings', margin, yPosition);
-    yPosition += 8;
-
+  // ═══════════════════════════════════════════════════════════════════════════
+  // O — OBJECTIVE  (structured AI findings with confidence)
+  // ═══════════════════════════════════════════════════════════════════════════
+  soapSection('OBJECTIVE — AI-Extracted Findings', 'O')
+  if (structured?.findings?.length > 0) {
+    structured.findings.forEach((f: any, i: number) => {
+      checkNewPage(12)
+      const conf = f.confidence ? ` [${f.confidence} confidence]` : ''
+      const sev = f.severity && f.severity !== 'NORMAL' ? `  (${f.severity})` : ''
+      addFormattedText(`${i + 1}. ${f.finding}${conf}${sev}`, 10, false, 5, 1.2)
+    })
+  } else {
     const findingsArray = Array.isArray(data.findings)
-      ? data.findings.map(f => typeof f === 'string' ? f : f.finding)
-      : [];
+      ? data.findings.map(f => typeof f === 'string' ? f : (f as any).finding)
+      : []
+    if (findingsArray.length > 0) {
+      findingsArray.forEach((f, i) => addFormattedText(`${i + 1}. ${stripMarkdown(f)}`, 10, false, 5, 1.2))
+    } else {
+      addFormattedText('No discrete findings extracted.', 10, false, 5, 1.2)
+    }
+  }
+  const keywordsArray = Array.isArray(data.keywords)
+    ? data.keywords.map(k => typeof k === 'string' ? k : (k as any).keyword)
+    : []
+  if (keywordsArray.length > 0) {
+    yPosition += 3
+    addFormattedText(`Keywords: ${keywordsArray.join(', ')}`, 9, false, 5, 1.1)
+  }
+  yPosition += 6
 
-    findingsArray.forEach((finding, index) => {
-      const parsed = parseMarkdownLine(finding);
-      addFormattedText(`${index + 1}. ${parsed.text}`, 10, parsed.isBold, 5, 1.15);
-    });
-    yPosition += 8;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // A — ASSESSMENT  (full AI analysis narrative)
+  // ═══════════════════════════════════════════════════════════════════════════
+  soapSection('ASSESSMENT — AI Analysis Narrative', 'A')
+  if (data.analysis) {
+    addMarkdownText(data.analysis, 10)
+  }
+  yPosition += 6
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // P — PLAN  (follow-up recommendations + references)
+  // ═══════════════════════════════════════════════════════════════════════════
+  soapSection('PLAN — Recommended Follow-up', 'P')
+  if (structured?.recommended_followup?.length > 0) {
+    structured.recommended_followup.forEach((r: string, i: number) => {
+      addFormattedText(`${i + 1}. ${r}`, 10, false, 5, 1.2)
+    })
+  } else {
+    addFormattedText('Please consult your healthcare provider for follow-up recommendations.', 10, false, 5, 1.2)
+  }
+  if (structured?.icd10_hints?.length > 0) {
+    yPosition += 3
+    addFormattedText(`Approximate ICD-10 references (for coding guidance only): ${structured.icd10_hints.join(', ')}`, 9, false, 5, 1.1)
   }
 
-  // Keywords section
-  if (data.keywords && data.keywords.length > 0) {
-    checkNewPage(15);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Keywords / Tags', margin, yPosition);
-    yPosition += 8;
-
-    const keywordsArray = Array.isArray(data.keywords)
-      ? data.keywords.map(k => typeof k === 'string' ? k : k.keyword)
-      : [];
-
-    addFormattedText(keywordsArray.join(', '), 10, false, 0, 1.15);
-    yPosition += 8;
-  }
-
-  // References section
-  if (includeReferences && data.keywords) {
-    const keywordsArray = Array.isArray(data.keywords)
-      ? data.keywords.map(k => typeof k === 'string' ? k : k.keyword)
-      : [];
-
-    const references = await searchReferences(keywordsArray, 3);
-
+  // References
+  if (includeReferences && keywordsArray.length > 0) {
+    const references = await searchReferences(keywordsArray, 3)
     if (references.length > 0) {
-      checkNewPage(20);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Relevant References', margin, yPosition);
-      yPosition += 8;
-
-      references.forEach((ref, index) => {
-        checkNewPage(15);
-        addFormattedText(`${index + 1}. ${ref.title}`, 10, true, 5, 1.15);
-        addFormattedText(`   ${ref.source}, ${ref.year}`, 9, false, 5, 1.1);
-        yPosition += 3;
-      });
+      yPosition += 6
+      checkNewPage(20)
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold')
+      doc.text('Supporting Literature', margin + 3, yPosition); yPosition += 6
+      references.forEach((ref, i) => {
+        checkNewPage(14)
+        addFormattedText(`${i + 1}. ${ref.title}`, 9, true, 5, 1.15)
+        addFormattedText(`   ${ref.source}, ${ref.year}`, 8, false, 5, 1.1)
+        yPosition += 2
+      })
     }
   }
 
-  // Footer
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(100, 100, 100);
-  doc.text(
-    'This report is generated by AI and should be reviewed by a medical professional.',
-    pageWidth / 2,
-    pageHeight - 10,
-    { align: 'center' }
-  );
+  // ── Footer on every page ────────────────────────────────────────────────────
+  const totalPages = (doc as any).internal.getNumberOfPages()
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p)
+    doc.setFillColor(248, 245, 255)
+    doc.rect(0, pageHeight - 14, pageWidth, 14, 'F')
+    doc.setFontSize(7); doc.setFont('helvetica', 'italic'); doc.setTextColor(120, 80, 180)
+    doc.text(
+      '⚕ CLINICAL DECISION SUPPORT ONLY — AI output must be verified by a licensed physician before clinical action.  |  HealthIQ v2.0',
+      pageWidth / 2, pageHeight - 5, { align: 'center' }
+    )
+    doc.setTextColor(150, 150, 150)
+    doc.text(`Page ${p} / ${totalPages}`, pageWidth - margin, pageHeight - 5, { align: 'right' })
+  }
+  doc.setTextColor(0, 0, 0)
 
   return doc.output('blob');
 }

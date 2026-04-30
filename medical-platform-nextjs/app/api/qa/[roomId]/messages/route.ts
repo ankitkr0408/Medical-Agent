@@ -1,9 +1,17 @@
-// QA messages route - matches Python qa_interface.py add_message_db / get_messages_db
+// QA messages route — streams AI response via SSE, saves both messages to DB
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { ReportQAChat, ReportQASystem } from '@/lib/services/qa-system'
+import { auditLog } from '@/lib/db/audit'
 
 const qaChat = new ReportQAChat()
+
+// Per-user QA sessions to preserve multi-turn history across requests
+const qaSessions = new Map<string, ReportQASystem>()
+
+function sseEvent(data: object) {
+  return `data: ${JSON.stringify(data)}\n\n`
+}
 
 export async function GET(
     request: NextRequest,
@@ -26,39 +34,72 @@ export async function POST(
     request: NextRequest,
     { params }: { params: { roomId: string } }
 ) {
-    try {
-        const session = await auth()
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        const body = await request.json()
-        const { message } = body
-        if (!message?.trim()) {
-            return NextResponse.json({ error: 'Message is required' }, { status: 400 })
-        }
-
-        const userName = session.user.name || 'User'
-        const userId = session.user.id
-
-        // 1. Store user message (matches Python add_message_db)
-        await qaChat.addMessage(params.roomId, userName, message)
-
-        // 2. Get RAG-based AI answer (matches Python qa_system.answer_question)
-        const apiKey = process.env.OPENAI_API_KEY
-        if (!apiKey) {
-            return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
-        }
-
-        const qaSystem = new ReportQASystem(apiKey)
-        const answer = await qaSystem.answerQuestion(message, userId)
-
-        // 3. Store AI response (matches Python add_message_db for "Report QA System")
-        await qaChat.addMessage(params.roomId, 'Report QA System', answer)
-
-        return NextResponse.json({ success: true, data: { answer } })
-    } catch (error) {
-        console.error('QA message error:', error)
-        return NextResponse.json({ error: 'Failed to process message' }, { status: 500 })
+    const session = await auth()
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const body = await request.json()
+    const { message } = body
+    if (!message?.trim()) {
+        return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+    }
+
+    const userName = session.user.name || 'User'
+    const userId = session.user.id
+
+    // Save user message immediately before streaming starts
+    await qaChat.addMessage(params.roomId, userName, message)
+
+    // Reuse session for multi-turn conversation memory
+    if (!qaSessions.has(userId)) {
+        qaSessions.set(userId, new ReportQASystem(apiKey))
+    }
+    const qaSystem = qaSessions.get(userId)!
+
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+        async start(controller) {
+            try {
+                let fullAnswer = ''
+                for await (const token of qaSystem.answerQuestionStream(message, userId)) {
+                    fullAnswer += token
+                    controller.enqueue(encoder.encode(sseEvent({ type: 'token', text: token })))
+                }
+
+                // Save AI response to DB once complete
+                await qaChat.addMessage(params.roomId, 'Report QA System', fullAnswer)
+
+                await auditLog({
+                    user_id: userId,
+                    action: 'qa_answer',
+                    route: `/api/qa/${params.roomId}/messages`,
+                    model: 'gpt-4o-mini',
+                    input_summary: message.slice(0, 80),
+                    success: true,
+                    timestamp: new Date().toISOString(),
+                })
+
+                controller.enqueue(encoder.encode(sseEvent({ type: 'done' })))
+            } catch (error) {
+                console.error('QA stream error:', error)
+                controller.enqueue(encoder.encode(sseEvent({ type: 'error', message: 'Failed to answer' })))
+            } finally {
+                controller.close()
+            }
+        },
+    })
+
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        },
+    })
 }

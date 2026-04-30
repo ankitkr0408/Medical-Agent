@@ -3,6 +3,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import OpenAI from 'openai'
 import { qaAnalysesCol, qaChatsCol } from '@/lib/db/collections'
+import { queryRelevantAnalyses } from './pinecone-rag'
 
 interface Message { role: 'system' | 'user' | 'assistant'; content: string }
 
@@ -32,22 +33,41 @@ export class ReportQASystem {
     return dot / (magA * magB)
   }
 
-  // Matches Python get_relevant_contexts() - reads from "qa_analyses" collection
+  // Matches Python get_relevant_contexts() — uses Pinecone when available, in-memory fallback
   async getRelevantContexts(query: string, topK = 3, userId?: string): Promise<string[]> {
     try {
-      const queryEmbedding = await this.getEmbeddings(query)
       const col = await qaAnalysesCol()
-      // Python filters by user_id when provided
+
+      // ── Fast path: Pinecone vector search ──────────────────────────────────
+      if (userId) {
+        const pineconeHits = await queryRelevantAnalyses(query, userId, topK)
+        if (pineconeHits && pineconeHits.length > 0) {
+          // Fetch full analysis text from MongoDB using IDs returned by Pinecone
+          const ids = pineconeHits.map(h => h.id)
+          const docs = await col.find({ id: { $in: ids } }).toArray()
+          if (docs.length > 0) {
+            // Re-sort by Pinecone score order
+            const scoreMap = Object.fromEntries(pineconeHits.map(h => [h.id, h.score]))
+            docs.sort((a, b) => (scoreMap[b.id] ?? 0) - (scoreMap[a.id] ?? 0))
+            return docs.map(doc => {
+              let text = doc.analysis || ''
+              if (doc.findings?.length) text += `\n\nFindings:\n${doc.findings.map((f: string) => `- ${f}`).join('\n')}`
+              text += `\n\nImage: ${doc.filename || 'unknown'}\nDate: ${String(doc.date || '').slice(0, 10)}`
+              return text
+            })
+          }
+        }
+      }
+
+      // ── Slow fallback: in-memory cosine similarity (no Pinecone) ───────────
       const docs = await col.find(userId ? { user_id: userId } : {}).toArray()
       if (docs.length === 0) return ['No previous analyses found.']
 
+      const queryEmbedding = await this.getEmbeddings(query)
       const scored = await Promise.all(docs.map(async (doc) => {
         let text = doc.analysis || ''
-        if (doc.findings?.length) {
-          text += `\n\nFindings:\n${doc.findings.map((f: string) => `- ${f}`).join('\n')}`
-        }
-        text += `\n\nImage: ${doc.filename || 'unknown'}`
-        text += `\nDate: ${String(doc.date || '').slice(0, 10)}`
+        if (doc.findings?.length) text += `\n\nFindings:\n${doc.findings.map((f: string) => `- ${f}`).join('\n')}`
+        text += `\n\nImage: ${doc.filename || 'unknown'}\nDate: ${String(doc.date || '').slice(0, 10)}`
         const emb = await this.getEmbeddings(text)
         return { score: this.cosineSimilarity(queryEmbedding, emb), text }
       }))
@@ -70,12 +90,12 @@ export class ReportQASystem {
 
     this.conversationHistory.push({ role: 'user', content: question })
     try {
-      const systemPrompt = `You are a medical AI assistant answering questions about medical reports.\nUse the following medical report contexts to answer the question.\nIf the answer cannot be found in the contexts, say so.\n\nContexts:\n${contexts.join('\n\n---\n\n')}`
+      const systemPrompt = `You are a precise medical AI assistant. Answer questions strictly based on the patient's medical reports below.\n\nCRITICAL RULES:\n1. Only answer from the provided contexts. Never invent findings not present.\n2. If the answer is not in the contexts, say: "I cannot find that information in your reports."\n3. Use plain language. Avoid unnecessary jargon.\n4. Always recommend consulting a licensed physician for clinical decisions.\n\nMedical Report Contexts:\n${contexts.join('\n\n---\n\n')}`
       const response = await this.client.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'system', content: systemPrompt }, ...this.conversationHistory],
-        max_tokens: 500,
-        temperature: 0.3,
+        max_tokens: 600,
+        temperature: 0.1,
       })
       const answer = response.choices[0].message.content?.trim() || 'No response generated.'
       this.conversationHistory.push({ role: 'assistant', content: answer })
@@ -83,6 +103,45 @@ export class ReportQASystem {
       return answer
     } catch (error) {
       return `I encountered an error: ${error}`
+    }
+  }
+
+  // Streaming variant — yields text chunks for SSE
+  async *answerQuestionStream(question: string, userId?: string): AsyncGenerator<string> {
+    if (!this.client) {
+      yield 'Please configure an OpenAI API key to enable the QA system.'
+      return
+    }
+
+    const contexts = await this.getRelevantContexts(question, 3, userId)
+    if (contexts[0] === 'No previous analyses found.') {
+      yield "I don't have any medical reports to reference. Please upload and analyze some images first."
+      return
+    }
+
+    this.conversationHistory.push({ role: 'user', content: question })
+    const systemPrompt = `You are a precise medical AI assistant. Answer questions strictly based on the patient's medical reports below.\n\nCRITICAL RULES:\n1. Only answer from the provided contexts. Never invent findings not present.\n2. If the answer is not in the contexts, say: "I cannot find that information in your reports."\n3. Use plain language. Avoid unnecessary jargon.\n4. Always recommend consulting a licensed physician for clinical decisions.\n\nMedical Report Contexts:\n${contexts.join('\n\n---\n\n')}`
+
+    const stream = await this.client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      stream: true,
+      messages: [{ role: 'system', content: systemPrompt }, ...this.conversationHistory],
+      max_tokens: 600,
+      temperature: 0.1,
+    })
+
+    let fullAnswer = ''
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content
+      if (text) {
+        fullAnswer += text
+        yield text
+      }
+    }
+
+    this.conversationHistory.push({ role: 'assistant', content: fullAnswer })
+    if (this.conversationHistory.length > 10) {
+      this.conversationHistory = this.conversationHistory.slice(-10)
     }
   }
 
