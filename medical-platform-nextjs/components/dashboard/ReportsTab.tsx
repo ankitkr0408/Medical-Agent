@@ -125,7 +125,7 @@ export default function ReportsTab() {
       <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 text-white rounded-xl p-6 shadow-lg">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-2xl font-bold mb-2 flex items-center">
+            <h2 className="text-lg md:text-2xl font-bold mb-2 flex items-center">
               <span className="mr-3">📊</span>
               Medical Reports & Analytics
             </h2>
@@ -133,8 +133,8 @@ export default function ReportsTab() {
               Comprehensive analysis history with AI-powered insights
             </p>
           </div>
-          <div className="bg-white/20 backdrop-blur-sm rounded-lg px-6 py-3 text-center">
-            <div className="text-3xl font-bold">{reports.length}</div>
+          <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 md:px-6 py-3 text-center shrink-0">
+            <div className="text-2xl md:text-3xl font-bold">{reports.length}</div>
             <div className="text-xs text-blue-100 mt-1">Total Reports</div>
           </div>
         </div>
@@ -156,7 +156,7 @@ export default function ReportsTab() {
               >
                 {/* Medical Report Header with Color Accent */}
                 <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-b-2 border-purple-200 p-6">
-                  <div className="flex justify-between items-start">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="bg-purple-600 text-white rounded-lg px-3 py-1 text-xs font-bold">
@@ -184,28 +184,18 @@ export default function ReportsTab() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                       <button
                         onClick={() => handleGeneratePDF(report.id)}
                         disabled={generatingPDF === report.id}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold shadow-md hover:shadow-lg"
+                        className="flex items-center gap-1 px-3 md:px-5 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-sm font-semibold shadow-md"
                       >
-                        {generatingPDF === report.id ? (
-                          <>
-                            <span className="animate-spin">⏳</span>
-                            Generating...
-                          </>
-                        ) : (
-                          <>
-                            <span>📄</span>
-                            Export PDF
-                          </>
-                        )}
+                        {generatingPDF === report.id ? <><span className="animate-spin">⏳</span><span className="hidden md:inline">Generating...</span></> : <><span>📄</span><span className="hidden md:inline">Export PDF</span><span className="md:hidden">PDF</span></>}
                       </button>
                       <button
                         onClick={() => handleDeleteReport(report.id)}
                         disabled={deletingReport === report.id}
-                        className="px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold shadow-md hover:shadow-lg"
+                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50 text-xs md:text-sm font-semibold shadow-md"
                         title="Delete Report"
                       >
                         {deletingReport === report.id ? '⏳' : '🗑️'}

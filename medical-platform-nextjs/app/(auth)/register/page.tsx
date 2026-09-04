@@ -12,7 +12,7 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'doctor',
+    role: 'user',
     specialization: '',
   });
   const [error, setError] = useState('');
@@ -135,37 +135,6 @@ export default function RegisterPage() {
                   placeholder="you@example.com"
                 />
               </div>
-
-              <div>
-                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                  Role
-                </label>
-                <select
-                  id="role"
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                >
-                  <option value="doctor">Doctor</option>
-                  <option value="patient">Patient</option>
-                </select>
-              </div>
-
-              {formData.role === 'doctor' && (
-                <div>
-                  <label htmlFor="specialization" className="block text-sm font-medium text-gray-700 mb-2">
-                    Specialization (Optional)
-                  </label>
-                  <input
-                    id="specialization"
-                    type="text"
-                    value={formData.specialization}
-                    onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                    placeholder="Radiology, Cardiology, etc."
-                  />
-                </div>
-              )}
 
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
