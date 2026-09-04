@@ -116,8 +116,8 @@ export default function QATab() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[680px]">
-      <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3 overflow-y-auto">
+    <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:h-[680px]">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3 overflow-y-auto lg:h-full">
         <h3 className="font-bold text-gray-900">🩺 Medical Report Q&A</h3>
         <div className="flex rounded-lg overflow-hidden border border-gray-200">
           {(['join', 'create'] as const).map(t => (
@@ -183,7 +183,7 @@ export default function QATab() {
         )}
       </div>
 
-      <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl flex flex-col overflow-hidden">
+      <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl flex flex-col overflow-hidden min-h-[400px] lg:h-full">
         {currentRoom ? (
           <>
             <div className="p-4 border-b border-gray-200">
